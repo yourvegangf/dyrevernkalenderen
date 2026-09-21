@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html lang="nb">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dyrevernkalenderen</title>
+<meta name="description" content="Felles kalender for dyrevernarrangementer i Norge – demonstrasjoner, stands, foredrag, film og frivillig innsats.">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --bg: #f6f5f0;
+    --surface: #ffffff;
+    --surface-2: #efede6;
+    --text: #1d1d1b;
+    --muted: #6c6b65;
+    --border: #dedbd1;
+    --accent: #2f7a4f;
+    --accent-hover: #256640;
+    --on-accent: #ffffff;
+    --pending: #b3600a;
+    --danger: #b42318;
+    --today: #2f7a4f;
+    --radius: 12px;
+    --shadow: 0 6px 24px rgba(0,0,0,.10);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #141513; --surface: #1e1f1c; --surface-2: #262823; --text: #ebeae4;
+      --muted: #a4a39b; --border: #34362f; --accent: #55b07f; --accent-hover: #6cc292;
+      --on-accent: #0f1a13; --pending: #e0902f; --danger: #f0665b; --today: #55b07f;
+      --shadow: 0 6px 24px rgba(0,0,0,.5);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #141513; --surface: #1e1f1c; --surface-2: #262823; --text: #ebeae4;
+    --muted: #a4a39b; --border: #34362f; --accent: #55b07f; --accent-hover: #6cc292;
+    --on-accent: #0f1a13; --pending: #e0902f; --danger: #f0665b; --today: #55b07f;
+    --shadow: 0 6px 24px rgba(0,0,0,.5);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--accent); }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  input, select, textarea { font: inherit; color: var(--text); }
+  h1, h2, h3, h4 { margin: 0; line-height: 1.2; }
+  [hidden] { display: none !important; }
+
+  .wrap { max-width: 960px; margin: 0 auto; padding: 0 16px; }
+
+  header.top {
+    position: sticky; top: 0; z-index: 5;
+    background: var(--surface); border-bottom: 1px solid var(--border);
+  }
+  header.top .wrap { display: flex; align-items: center; gap: 12px; padding: 12px 16px; }
+  header.top h1 { font-size: 1.15rem; letter-spacing: -.01em; flex: 1; white-space: nowrap; }
+  header.top h1 span { color: var(--accent); }
+  .city-select {
+    padding: 8px 32px 8px 12px; border: 1px solid var(--border); border-radius: 999px;
+    background: var(--surface-2); appearance: none; -webkit-appearance: none;
+    background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+    background-position: calc(100% - 16px) 55%, calc(100% - 11px) 55%; background-size: 5px 5px; background-repeat: no-repeat;
+    font-weight: 600; max-width: 45vw; text-overflow: ellipsis;
+  }
+
+  .banner {
+    background: #fff4d6; color: #5a3d00; border-bottom: 1px solid #f0d78a;
+    font-size: .9rem; padding: 8px 0;
+  }
+  :root[data-theme="dark"] .banner { background: #3a2d0c; color: #ffd98a; border-color: #5a4614; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .banner { background: #3a2d0c; color: #ffd98a; border-color: #5a4614; } }
+
+  .toolbar { display: flex; align-items: center; gap: 10px; padding: 14px 0 6px; flex-wrap: wrap; }
+  .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 999px; overflow: hidden; background: var(--surface); }
+  .seg button { border: 0; background: transparent; padding: 8px 16px; font-weight: 600; color: var(--muted); }
+  .seg button.active { background: var(--accent); color: var(--on-accent); }
+  .btn {
+    border: 1px solid var(--border); background: var(--surface); border-radius: 999px;
+    padding: 9px 16px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+  }
+  .btn:hover { border-color: var(--muted); }
+  .btn.primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+  .btn.primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+  .btn.danger { color: var(--danger); }
+  .btn.small { padding: 6px 12px; font-size: .9rem; }
+  .spacer { flex: 1; }
+
+  /* Måned */
+  .month-nav { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; }
+  .month-nav h2 { font-size: 1.15rem; text-transform: capitalize; }
+  .month-nav button { border: 1px solid var(--border); background: var(--surface); border-radius: 999px; width: 40px; height: 40px; font-size: 1.3rem; line-height: 1; }
+  .weekdays, .grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 3px; }
+  .weekdays div { text-align: center; font-size: .75rem; color: var(--muted); font-weight: 600; padding: 4px 0; text-transform: uppercase; letter-spacing: .04em; }
+  .cell {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+    min-height: 60px; padding: 5px; cursor: pointer; display: flex; flex-direction: column; gap: 3px;
+    overflow: hidden; position: relative; text-align: left;
+  }
+  .cell.other { opacity: .38; }
+  .cell.selected { outline: 2px solid var(--accent); outline-offset: -2px; }
+  .cell .num { font-size: .8rem; font-weight: 600; color: var(--muted); width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; }
+  .cell.today .num { background: var(--today); color: var(--on-accent); }
+  .cell .dots { display: flex; flex-wrap: wrap; gap: 3px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--c); }
+  .dot.pending { background: transparent; border: 2px solid var(--c); width: 8px; height: 8px; }
+  .chip {
+    display: none; font-size: .72rem; line-height: 1.2; padding: 2px 5px; border-radius: 4px;
+    background: color-mix(in srgb, var(--c) 18%, transparent); border-left: 3px solid var(--c);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .chip.pending { border-left-style: dashed; opacity: .8; }
+  .cell .more { font-size: .7rem; color: var(--muted); }
+  @media (min-width: 700px) {
+    .cell { min-height: 100px; }
+    .cell .dots { display: none; }
+    .chip { display: block; }
+  }
+
+  .day-list { margin-top: 16px; }
+  .day-list h3, .list h3 {
+    font-size: .85rem; color: var(--muted); text-transform: uppercase; letter-spacing: .05em;
+    margin: 18px 0 8px; font-weight: 700;
+  }
+  .empty { color: var(--muted); padding: 24px 12px; text-align: center; background: var(--surface); border: 1px dashed var(--border); border-radius: var(--radius); }
+
+  /* Kort */
+  .card {
+    display: flex; gap: 0; background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); overflow: hidden; margin-bottom: 8px; cursor: pointer;
+    transition: transform .08s ease;
+  }
+  .card:hover { transform: translateY(-1px); border-color: var(--muted); }
+  .card .bar { width: 6px; background: var(--c); flex: none; }
+  .card.pending .bar { background: repeating-linear-gradient(to bottom, var(--c) 0 6px, transparent 6px 10px); }
+  .card .body { padding: 10px 12px; min-width: 0; flex: 1; }
+  .card h4 { font-size: 1rem; margin: 2px 0; }
+  .card .meta { font-size: .82rem; color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; }
+  .badge { font-size: .72rem; font-weight: 700; padding: 1px 8px; border-radius: 999px; background: color-mix(in srgb, var(--pending) 15%, transparent); color: var(--pending); }
+  .badge.cat { background: color-mix(in srgb, var(--c) 18%, transparent); color: var(--text); }
+
+  footer { margin: 40px 0 60px; color: var(--muted); font-size: .85rem; }
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 10px 0; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .legend i { width: 10px; height: 10px; border-radius: 50%; background: var(--c); display: inline-block; }
+
+  /* Dialoger */
+  dialog {
+    border: 0; border-radius: 16px; padding: 0; background: var(--surface); color: var(--text);
+    width: min(560px, calc(100vw - 24px)); max-height: calc(100vh - 24px); box-shadow: var(--shadow);
+  }
+  dialog::backdrop { background: rgba(0,0,0,.45); }
+  dialog .dlg-head { display: flex; align-items: flex-start; gap: 10px; padding: 18px 20px 6px; }
+  dialog .dlg-head h2 { font-size: 1.25rem; flex: 1; }
+  dialog .close { border: 0; background: var(--surface-2); border-radius: 50%; width: 34px; height: 34px; font-size: 1.1rem; flex: none; }
+  dialog .dlg-body { padding: 6px 20px 20px; overflow: auto; }
+  .kv { display: grid; grid-template-columns: 24px 1fr; gap: 6px 10px; margin: 12px 0; align-items: start; }
+  .kv .ic { text-align: center; }
+  .desc { white-space: pre-wrap; margin: 12px 0; }
+  .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+  .approve-box {
+    margin: 12px 0; padding: 12px; border-radius: 10px;
+    background: color-mix(in srgb, var(--pending) 10%, transparent); border: 1px dashed var(--pending);
+  }
+  .approve-box strong { color: var(--pending); }
+  .progress { display: flex; gap: 4px; margin: 8px 0; }
+  .progress i { flex: 1; height: 6px; border-radius: 3px; background: var(--border); }
+  .progress i.on { background: var(--pending); }
+
+  form .row { display: grid; gap: 4px; margin-bottom: 12px; }
+  form .row.two { grid-template-columns: 1fr 1fr; gap: 10px; }
+  form .row.two > .row { margin: 0; }
+  form label { font-size: .85rem; font-weight: 600; }
+  form label small { font-weight: 400; color: var(--muted); }
+  form input[type=text], form input[type=email], form input[type=url], form input[type=date], form input[type=time], form select, form textarea {
+    width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg);
+  }
+  form textarea { min-height: 90px; resize: vertical; }
+  form .check { display: flex; align-items: center; gap: 8px; font-weight: 500; }
+  .weekday-picks { display: flex; gap: 6px; flex-wrap: wrap; }
+  .weekday-picks label {
+    border: 1px solid var(--border); border-radius: 999px; padding: 6px 12px; cursor: pointer; font-weight: 600; font-size: .85rem;
+  }
+  .weekday-picks input { display: none; }
+  .weekday-picks input:checked + span { color: var(--on-accent); }
+  .weekday-picks label:has(input:checked) { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+  .err { color: var(--danger); font-size: .9rem; margin: 6px 0; }
+  .hint { color: var(--muted); font-size: .85rem; }
+
+  .toast {
+    position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%) translateY(20px);
+    background: var(--text); color: var(--bg); padding: 10px 18px; border-radius: 999px;
+    box-shadow: var(--shadow); opacity: 0; transition: .25s; z-index: 50; max-width: calc(100vw - 32px); text-align: center; font-weight: 600;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  .fab {
+    position: fixed; right: 16px; bottom: 16px; z-index: 6; display: none;
+    background: var(--accent); color: var(--on-accent); border: 0; border-radius: 999px;
+    padding: 14px 20px; font-weight: 700; box-shadow: var(--shadow); font-size: 1rem;
+  }
+  @media (max-width: 699px) {
+    .fab { display: inline-flex; align-items: center; gap: 6px; }
+    #btn-new { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <h1>🐾 Dyrevern<span>kalenderen</span></h1>
+    <select id="city" class="city-select" aria-label="Velg by"></select>
+  </div>
+</header>
+
+<div id="banner" class="banner" hidden><div class="wrap"></div></div>
+
+<div class="wrap">
+  <div class="toolbar">
+    <div class="seg" role="tablist">
+      <button data-view="month" class="active">Måned</button>
+      <button data-view="list">Liste</button>
+    </div>
+    <div class="spacer"></div>
+    <button id="btn-export" class="btn small" title="Last ned alle godkjente arrangementer for valgt by">⤓ .ics</button>
+    <button id="btn-new" class="btn primary">+ Foreslå arrangement</button>
+  </div>
+
+  <main>
+    <section id="month-view">
+      <div class="month-nav">
+        <button id="prev" aria-label="Forrige måned">‹</button>
+        <h2 id="month-title"></h2>
+        <button id="next" aria-label="Neste måned">›</button>
+      </div>
+      <div class="weekdays"><div>man</div><div>tir</div><div>ons</div><div>tor</div><div>fre</div><div>lør</div><div>søn</div></div>
+      <div id="grid" class="grid"></div>
+      <div id="day-list" class="day-list"></div>
+    </section>
+
+    <section id="list-view" class="list" hidden>
+      <div id="list"></div>
+      <div style="text-align:center;margin:16px 0"><button id="more" class="btn">Vis flere måneder</button></div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="legend" id="legend"></div>
+    <p>Alle kan foreslå arrangementer. Et forslag blir synlig som «venter» med én gang, og godkjent når tre andre personer har godkjent det. Forslag som ikke får tre godkjenninger innen 14 dager, fjernes. Arrangementer merket «Nasjonalt / digitalt» vises i alle byer.</p>
+    <p>Vil du ha kalenderen i din egen kalender-app? Trykk «.ics» øverst for å laste ned alle godkjente arrangementer i valgt by, eller last ned ett arrangement om gangen.</p>
+  </footer>
+</div>
+
+<button class="fab" id="fab">+ Foreslå</button>
+
+<!-- Arrangement-detaljer -->
+<dialog id="dlg-event">
+  <div class="dlg-head"><h2 id="ev-title"></h2><button class="close" data-close aria-label="Lukk">✕</button></div>
+  <div class="dlg-body" id="ev-body"></div>
+</dialog>
+
+<!-- Nytt arrangement -->
+<dialog id="dlg-new">
+  <div class="dlg-head"><h2>Foreslå arrangement</h2><button class="close" data-close aria-label="Lukk">✕</button></div>
+  <div class="dlg-body">
+    <form id="form-new" novalidate>
+      <div class="row two">
+        <div class="row"><label for="f-name">Ditt navn</label><input id="f-name" type="text" required maxlength="80" autocomplete="name"></div>
+        <div class="row"><label for="f-email">Din e-post <small>(vises ikke)</small></label><input id="f-email" type="email" required autocomplete="email"></div>
+      </div>
+      <div class="row"><label for="f-title">Tittel</label><input id="f-title" type="text" required maxlength="120" placeholder="F.eks. Demonstrasjon mot pelsdyrimport"></div>
+      <div class="row two">
+        <div class="row"><label for="f-category">Kategori</label><select id="f-category" required></select></div>
+        <div class="row"><label for="f-city">By</label><select id="f-city" required></select></div>
+      </div>
+      <div class="row"><label for="f-location">Sted <small>(adresse eller møtepunkt)</small></label><input id="f-location" type="text" maxlength="200" placeholder="F.eks. Eidsvolls plass, foran Stortinget"></div>
+      <div class="row two">
+        <div class="row"><label for="f-date">Dato</label><input id="f-date" type="date" required></div>
+        <div class="row"><label for="f-start">Starter <small>(valgfritt)</small></label><input id="f-start" type="time"></div>
+      </div>
+      <div class="row two">
+        <div class="row"><label for="f-end">Slutter <small>(valgfritt)</small></label><input id="f-end" type="time"></div>
+        <div class="row"><label for="f-organizer">Arrangør</label><input id="f-organizer" type="text" maxlength="120"></div>
+      </div>
+      <div class="row">
+        <label class="check"><input id="f-recurring" type="checkbox"> Gjentas ukentlig</label>
+      </div>
+      <div id="recur-fields" hidden>
+        <div class="row">
+          <label>Hvilke dager?</label>
+          <div class="weekday-picks" id="weekday-picks"></div>
+        </div>
+        <div class="row"><label for="f-until">Siste dato <small>(valgfritt – tomt betyr inntil videre)</small></label><input id="f-until" type="date"></div>
+      </div>
+      <div class="row"><label for="f-url">Lenke <small>(Facebook-arrangement, nettside …)</small></label><input id="f-url" type="url" maxlength="500" placeholder="https://"></div>
+      <div class="row"><label for="f-desc">Beskrivelse</label><textarea id="f-desc" maxlength="2000"></textarea></div>
+      <div class="err" id="form-err"></div>
+      <p class="hint">Forslaget vises som «venter» med en gang, og blir godkjent når tre andre personer har godkjent det.</p>
+      <div class="actions"><button type="submit" class="btn primary" id="f-submit">Send inn forslag</button><button type="button" class="btn" data-close>Avbryt</button></div>
+    </form>
+  </div>
+</dialog>
+
+<!-- Hvem er du? (godkjenning) -->
+<dialog id="dlg-identity">
+  <div class="dlg-head"><h2 id="id-title">Hvem er du?</h2><button class="close" data-close aria-label="Lukk">✕</button></div>
+  <div class="dlg-body">
+    <form id="form-identity" novalidate>
+      <p class="hint" id="id-hint"></p>
+      <div class="row"><label for="i-name">Navn</label><input id="i-name" type="text" required maxlength="80" autocomplete="name"></div>
+      <div class="row"><label for="i-email">E-post <small>(vises ikke, brukes bare for å hindre dobbeltstemmer)</small></label><input id="i-email" type="email" required autocomplete="email"></div>
+      <div class="err" id="id-err"></div>
+      <div class="actions"><button type="submit" class="btn primary" id="id-submit">Fortsett</button><button type="button" class="btn" data-close>Avbryt</button></div>
+    </form>
+  </div>
+</dialog>
+
+<!-- Rapporter -->
+<dialog id="dlg-report">
+  <div class="dlg-head"><h2>Rapporter arrangement</h2><button class="close" data-close aria-label="Lukk">✕</button></div>
+  <div class="dlg-body">
+    <form id="form-report" novalidate>
+      <p class="hint">Blir et arrangement rapportert av tre ulike personer, skjules det automatisk.</p>
+      <div class="row"><label for="r-email">Din e-post</label><input id="r-email" type="email" required autocomplete="email"></div>
+      <div class="row"><label for="r-reason">Hvorfor?</label>
+        <select id="r-reason">
+          <option value="Spam eller reklame">Spam eller reklame</option>
+          <option value="Feil informasjon">Feil informasjon (dato, sted, avlyst)</option>
+          <option value="Upassende innhold">Upassende innhold</option>
+          <option value="Ikke dyrevern">Har ikke med dyrevern å gjøre</option>
+          <option value="Annet">Annet</option>
+        </select>
+      </div>
+      <div class="row"><label for="r-text">Utdyp <small>(valgfritt)</small></label><textarea id="r-text" maxlength="400"></textarea></div>
+      <div class="err" id="r-err"></div>
+      <div class="actions"><button type="submit" class="btn danger" id="r-submit">Send rapport</button><button type="button" class="btn" data-close>Avbryt</button></div>
+    </form>
+  </div>
+</dialog>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============================================================
+   OPPSETT – lim inn verdiene fra Supabase her (se OPPSETT.md)
+   ============================================================ */
+const CONFIG = {
+  SUPABASE_URL: 'https://ranakhqwreqxgbumpozi.supabase.co',        // f.eks. 'https://abcdefghijklmnop.supabase.co'
+  SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJhbmFraHF3cmVxeGdidW1wb3ppIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTAwMDU5ODksImV4cCI6MjEwNTU4MTk4OX0._gb-sBBwqnir9W1HxeiOkNP0kh2ftfKqIBrWeFI73ok'    // den lange «anon public»-nøkkelen
+};
+
+/* ---------- Faste lister ---------- */
+const NATIONAL = 'Nasjonalt / digitalt';
+const CITIES = ['Oslo','Bergen','Trondheim','Stavanger','Kristiansand','Tromsø','Drammen','Fredrikstad','Bodø','Ålesund','Tønsberg','Sandnes','Hamar','Lillehammer','Annet sted'];
+const CATEGORIES = {
+  demonstrasjon: { label: 'Demonstrasjon',     color: '#d64545' },
+  stand:         { label: 'Stand / aksjon',    color: '#e0851e' },
+  foredrag:      { label: 'Foredrag / debatt', color: '#2f7bd6' },
+  film:          { label: 'Film / kultur',     color: '#8b4fc9' },
+  frivillig:     { label: 'Frivillig / dugnad',color: '#2e9e5b' },
+  sosialt:       { label: 'Sosialt / mat',     color: '#d6489a' },
+  politisk:      { label: 'Høring / frist',    color: '#6b7280' },
+  digitalt:      { label: 'Digitalt',          color: '#0f9b9b' },
+  annet:         { label: 'Annet',             color: '#a37a2c' }
+};
+const WEEKDAY_SHORT = ['sø','ma','ti','on','to','fr','lø'];
+const WEEKDAY_LONG  = ['søndag','mandag','tirsdag','onsdag','torsdag','fredag','lørdag'];
+const BYDAY = ['SU','MO','TU','WE','TH','FR','SA'];
+const PENDING_DAYS = 14;
+const EVENT_COLUMNS = 'id,created_at,title,description,category,city,location,organizer,url,start_date,start_time,end_time,recurrence,weekdays,recur_until,submitter_name,approved,approval_count';
+
+/* ---------- Hjelpere ---------- */
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const pad = n => String(n).padStart(2, '0');
+const iso = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const parseISO = s => { const [y,m,d] = s.split('-').map(Number); return new Date(y, m-1, d); };
+const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate()+n); return x; };
+const hhmm = t => t ? t.slice(0,5) : '';
+const todayISO = iso(new Date());
+const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
+const fmtLong = s => cap(new Intl.DateTimeFormat('nb-NO', { weekday:'long', day:'numeric', month:'long' }).format(parseISO(s)));
+const fmtLongYear = s => cap(new Intl.DateTimeFormat('nb-NO', { weekday:'long', day:'numeric', month:'long', year:'numeric' }).format(parseISO(s)));
+const timeRange = ev => ev.start_time ? (hhmm(ev.start_time) + (ev.end_time ? '–' + hhmm(ev.end_time) : '')) : 'Hele dagen';
+const catOf = ev => CATEGORIES[ev.category] || CATEGORIES.annet;
+const isStale = ev => !ev.approved && (Date.now() - new Date(ev.created_at).getTime()) > PENDING_DAYS * 864e5;
+const validEmail = e => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e);
+
+let toastTimer;
+function toast(msg, ms = 3500) {
+  const t = $('#toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), ms);
+}
+async function copyText(text) {
+  try { await navigator.clipboard.writeText(text); return true; }
+  catch { const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select(); const ok = document.execCommand('copy'); ta.remove(); return ok; }
+}
+function download(name, content, type = 'text/calendar;charset=utf-8') {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([content], { type })); a.download = name;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+const identity = {
+  get() { try { return JSON.parse(localStorage.getItem('dvk_identity') || 'null'); } catch { return null; } },
+  set(v) { try { localStorage.setItem('dvk_identity', JSON.stringify(v)); } catch {} }
+};
+
+/* ---------- Database (Supabase, eller demo når ikke satt opp) ---------- */
+const db = {
+  live: !!(CONFIG.SUPABASE_URL && CONFIG.SUPABASE_ANON_KEY),
+  client: null,
+  demo: [],
+  init() {
+    if (this.live) {
+      this.client = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
+    } else {
+      const d = new Date(); const wed = addDays(d, (3 - d.getDay() + 7) % 7); const sat = addDays(d, (6 - d.getDay() + 7) % 7);
+      this.demo = [
+        { id:'demo-1', created_at:d.toISOString(), title:'AV-kube (Cube of Truth)', description:'Anonymous for the Voiceless holder Cube of Truth i Oslo sentrum hver onsdag. Møt opp og bli med – ingen forkunnskaper nødvendig.', category:'stand', city:'Oslo', location:'Oslo sentrum', organizer:'Anonymous for the Voiceless Oslo', url:null, start_date:iso(wed), start_time:'18:00:00', end_time:'20:00:00', recurrence:'weekly', weekdays:[3], recur_until:null, submitter_name:'Dyrevernkalenderen', approved:true, approval_count:3 },
+        { id:'demo-2', created_at:d.toISOString(), title:'AV-kube (Cube of Truth)', description:'Anonymous for the Voiceless holder Cube of Truth i Oslo sentrum hver lørdag. Møt opp og bli med – ingen forkunnskaper nødvendig.', category:'stand', city:'Oslo', location:'Oslo sentrum', organizer:'Anonymous for the Voiceless Oslo', url:null, start_date:iso(sat), start_time:'15:00:00', end_time:'18:00:00', recurrence:'weekly', weekdays:[6], recur_until:null, submitter_name:'Dyrevernkalenderen', approved:true, approval_count:3 },
+        { id:'demo-3', created_at:d.toISOString(), title:'Eksempel: Foredrag om dyrevelferd i landbruket', description:'Dette er et eksempel på et forslag som venter på godkjenning. Prøv å trykke «Godkjenn».', category:'foredrag', city:'Oslo', location:'Litteraturhuset', organizer:'Eksempelorganisasjonen', url:'https://example.org', start_date:iso(addDays(d, 9)), start_time:'18:00:00', end_time:'19:30:00', recurrence:null, weekdays:null, recur_until:null, submitter_name:'Kari Nordmann', approved:false, approval_count:1 },
+        { id:'demo-4', created_at:d.toISOString(), title:'Eksempel: Høringsfrist – ny dyrevelferdsmelding', description:'Nasjonal frist som vises i alle byer.', category:'politisk', city:NATIONAL, location:null, organizer:'Landbruks- og matdepartementet', url:null, start_date:iso(addDays(d, 20)), start_time:null, end_time:null, recurrence:null, weekdays:null, recur_until:null, submitter_name:'Ola Nordmann', approved:true, approval_count:3 }
+      ];
+    }
+  },
+  async load() {
+    if (!this.live) return this.demo.slice();
+    const { data, error } = await this.client.from('events').select(EVENT_COLUMNS).order('start_date');
+    if (error) throw error;
+    return data;
+  },
+  async addEvent(row) {
+    if (!this.live) { this.demo.push({ ...row, id:'demo-'+Date.now(), created_at:new Date().toISOString(), approved:false, approval_count:0 }); return; }
+    const { error } = await this.client.from('events').insert(row);
+    if (error) throw error;
+  },
+  async approve(eventId, name, email) {
+    if (!this.live) { const ev = this.demo.find(e => e.id === eventId); ev.approval_count++; if (ev.approval_count >= 3) ev.approved = true; return; }
+    const { error } = await this.client.from('approvals').insert({ event_id: eventId, voter_name: name, voter_email: email });
+    if (error) throw error;
+  },
+  async report(eventId, email, reason) {
+    if (!this.live) return;
+    const { error } = await this.client.from('reports').insert({ event_id: eventId, reporter_email: email, reason });
+    if (error) throw error;
+  }
+};
+function friendlyError(e) {
+  if (!e) return 'Ukjent feil.';
+  if (e.code === '23505') return 'Du har allerede gjort dette for dette arrangementet.';
+  if (e.code === '23514') return 'Noe i skjemaet var ugyldig. Sjekk feltene og prøv igjen.';
+  return e.message || String(e);
+}
+
+/* ---------- Tilstand ---------- */
+let events = [];
+let city = (() => { try { return localStorage.getItem('dvk_city'); } catch { return null; } })() || 'Oslo';
+let view = 'month';
+let cursor = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+let selectedDay = todayISO;
+let listMonths = 6;
+
+/* ---------- Forekomster (håndterer gjentakelse) ---------- */
+function inCity(ev) { return ev.city === city || ev.city === NATIONAL; }
+function instances(ev, from, to) {
+  const out = [];
+  if (ev.recurrence !== 'weekly') {
+    if (ev.start_date >= from && ev.start_date <= to) out.push({ ev, date: ev.start_date });
+    return out;
+  }
+  const days = ev.weekdays || [];
+  let d = parseISO(ev.start_date > from ? ev.start_date : from);
+  const endS = ev.recur_until && ev.recur_until < to ? ev.recur_until : to;
+  const end = parseISO(endS);
+  for (; d <= end; d = addDays(d, 1)) if (days.includes(d.getDay())) out.push({ ev, date: iso(d) });
+  return out;
+}
+function visibleInstances(from, to) {
+  const list = [];
+  for (const ev of events) {
+    if (!inCity(ev) || isStale(ev)) continue;
+    list.push(...instances(ev, from, to));
+  }
+  list.sort((a, b) => a.date.localeCompare(b.date) || (a.ev.start_time || '').localeCompare(b.ev.start_time || '') || a.ev.title.localeCompare(b.ev.title));
+  return list;
+}
+function firstOccurrence(ev) {
+  if (ev.recurrence !== 'weekly') return ev.start_date;
+  let d = parseISO(ev.start_date);
+  for (let i = 0; i < 7; i++, d = addDays(d, 1)) if ((ev.weekdays || []).includes(d.getDay())) return iso(d);
+  return ev.start_date;
+}
+function nextOccurrence(ev) {
+  const inst = instances(ev, todayISO, iso(addDays(new Date(), 366)));
+  return inst.length ? inst[0].date : firstOccurrence(ev);
+}
+
+/* ---------- Rendering ---------- */
+function cardHTML(inst) {
+  const ev = inst.ev, cat = catOf(ev), pending = !ev.approved;
+  return `<article class="card ${pending ? 'pending' : ''}" data-id="${esc(ev.id)}" data-date="${inst.date}" style="--c:${cat.color}">
+    <div class="bar"></div>
+    <div class="body">
+      <div class="meta"><span>${esc(timeRange(ev))}</span><span>·</span><span>${esc(cat.label)}</span>${pending ? `<span class="badge">Venter ${ev.approval_count}/3</span>` : ''}</div>
+      <h4>${esc(ev.title)}</h4>
+      <div class="meta">${esc([ev.location, ev.city !== city ? ev.city : ''].filter(Boolean).join(' · '))}${ev.recurrence ? ' <span>↻ ukentlig</span>' : ''}</div>
+    </div>
+  </article>`;
+}
+
+function renderMonth() {
+  const y = cursor.getFullYear(), m = cursor.getMonth();
+  $('#month-title').textContent = new Intl.DateTimeFormat('nb-NO', { month:'long', year:'numeric' }).format(cursor);
+  const daysInMonth = new Date(y, m+1, 0).getDate();
+  const first = new Date(y, m, 1);
+  const lead = (first.getDay() + 6) % 7;
+  const gridStart = addDays(first, -lead);
+  const totalCells = Math.ceil((lead + daysInMonth) / 7) * 7;
+  const gridEnd = addDays(gridStart, totalCells - 1);
+  const byDate = {};
+  for (const inst of visibleInstances(iso(gridStart), iso(gridEnd))) (byDate[inst.date] ||= []).push(inst);
+
+  let html = '';
+  for (let i = 0; i < totalCells; i++) {
+    const d = addDays(gridStart, i), s = iso(d), other = d.getMonth() !== m;
+    const list = byDate[s] || [];
+    const chips = list.slice(0, 3).map(x => `<span class="chip ${x.ev.approved ? '' : 'pending'}" style="--c:${catOf(x.ev).color}">${esc(x.ev.title)}</span>`).join('');
+    const dots = list.slice(0, 6).map(x => `<i class="dot ${x.ev.approved ? '' : 'pending'}" style="--c:${catOf(x.ev).color}"></i>`).join('');
+    html += `<button class="cell ${other ? 'other' : ''} ${s === todayISO ? 'today' : ''} ${s === selectedDay ? 'selected' : ''}" data-date="${s}" aria-label="${fmtLong(s)}">
+      <span class="num">${d.getDate()}</span>
+      ${dots ? `<span class="dots">${dots}</span>` : ''}${chips}${list.length > 3 ? `<span class="more">+${list.length - 3} til</span>` : ''}
+    </button>`;
+  }
+  $('#grid').innerHTML = html;
+  renderDayList();
+}
+function renderDayList() {
+  const list = visibleInstances(selectedDay, selectedDay);
+  $('#day-list').innerHTML = `<h3>${esc(fmtLongYear(selectedDay))}</h3>` +
+    (list.length ? list.map(cardHTML).join('') : `<div class="empty">Ingenting i ${esc(city)} denne dagen. <a href="#" data-new>Foreslå noe?</a></div>`);
+}
+function renderList() {
+  const to = new Date(); to.setMonth(to.getMonth() + listMonths);
+  const list = visibleInstances(todayISO, iso(to));
+  if (!list.length) { $('#list').innerHTML = `<div class="empty" style="margin-top:12px">Ingen arrangementer i ${esc(city)} de neste ${listMonths} månedene. <a href="#" data-new>Foreslå ett?</a></div>`; return; }
+  let html = '', last = '';
+  for (const inst of list) {
+    if (inst.date !== last) { html += `<h3>${esc(fmtLongYear(inst.date))}${inst.date === todayISO ? ' · i dag' : ''}</h3>`; last = inst.date; }
+    html += cardHTML(inst);
+  }
+  $('#list').innerHTML = html;
+}
+function render() {
+  $('#month-view').hidden = view !== 'month';
+  $('#list-view').hidden = view !== 'list';
+  document.querySelectorAll('.seg button').forEach(b => b.classList.toggle('active', b.dataset.view === view));
+  if (view === 'month') renderMonth(); else renderList();
+}
+
+/* ---------- Detaljvisning ---------- */
+function shareURL(ev, date) { return `${location.origin}${location.pathname}?event=${encodeURIComponent(ev.id)}&date=${date}`; }
+function shareText(ev, date) {
+  const lines = [`🐾 ${ev.title}`, `📅 ${fmtLong(date)}${ev.start_time ? ' kl. ' + timeRange(ev) : ''}`];
+  if (ev.location || ev.city !== NATIONAL) lines.push(`📍 ${[ev.location, ev.city].filter(Boolean).join(', ')}`);
+  if (ev.organizer) lines.push(`Arrangør: ${ev.organizer}`);
+  if (ev.url) lines.push(ev.url);
+  lines.push('', 'Fra Dyrevernkalenderen: ' + shareURL(ev, date));
+  return lines.join('\n');
+}
+function openEvent(id, date) {
+  const ev = events.find(e => e.id === id); if (!ev) return;
+  date = date || nextOccurrence(ev);
+  const cat = catOf(ev), pending = !ev.approved;
+  $('#ev-title').textContent = ev.title;
+  const recurText = ev.recurrence === 'weekly'
+    ? `Hver ${(ev.weekdays || []).slice().sort((a,b) => ((a+6)%7)-((b+6)%7)).map(w => WEEKDAY_LONG[w]).join(' og ')}${ev.recur_until ? ' til ' + fmtLong(ev.recur_until) : ''}`
+    : '';
+  $('#ev-body').innerHTML = `
+    <div><span class="badge cat" style="--c:${cat.color}">${esc(cat.label)}</span> ${pending ? `<span class="badge">Venter på godkjenning</span>` : ''}</div>
+    <div class="kv">
+      <span class="ic">📅</span><span><strong>${esc(fmtLongYear(date))}</strong>${ev.start_time ? ' kl. ' + esc(timeRange(ev)) : ''}${recurText ? `<br><span class="hint">↻ ${esc(recurText)}</span>` : ''}</span>
+      <span class="ic">📍</span><span>${esc([ev.location, ev.city].filter(Boolean).join(', ') || 'Sted ikke oppgitt')}</span>
+      ${ev.organizer ? `<span class="ic">👥</span><span>${esc(ev.organizer)}</span>` : ''}
+      ${ev.url ? `<span class="ic">🔗</span><span><a href="${esc(ev.url)}" target="_blank" rel="noopener">${esc(ev.url.replace(/^https?:\/\//,'').slice(0,60))}</a></span>` : ''}
+      <span class="ic">✍️</span><span class="hint">Foreslått av ${esc(ev.submitter_name)}</span>
+    </div>
+    ${ev.description ? `<div class="desc">${esc(ev.description)}</div>` : ''}
+    ${pending ? `<div class="approve-box">
+        <strong>${ev.approval_count} av 3 godkjenninger</strong>
+        <div class="progress">${[0,1,2].map(i => `<i class="${i < ev.approval_count ? 'on' : ''}"></i>`).join('')}</div>
+        <p class="hint" style="margin:6px 0 10px">Kjenner du til dette arrangementet og ser at det stemmer? Godkjenn det, så blir det synlig som bekreftet når tre personer har gjort det.</p>
+        <button class="btn primary" data-approve="${esc(ev.id)}">✓ Godkjenn</button>
+      </div>` : ''}
+    <div class="actions">
+      <button class="btn small" data-copy-link>🔗 Kopier lenke</button>
+      <button class="btn small" data-copy-text>📋 Kopier tekst til deling</button>
+      <button class="btn small" data-ics>⤓ Legg i kalender (.ics)</button>
+      <span class="spacer"></span>
+      <button class="btn small danger" data-report="${esc(ev.id)}">⚑ Rapporter</button>
+    </div>`;
+  const dlg = $('#dlg-event');
+  dlg.dataset.id = ev.id; dlg.dataset.date = date;
+  if (!dlg.open) dlg.showModal();
+}
+
+/* ---------- iCalendar ---------- */
+const icsEsc = s => String(s ?? '').replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n');
+function fold(line) {
+  const out = []; let s = line;
+  while (s.length > 74) { out.push(s.slice(0, 74)); s = ' ' + s.slice(74); }
+  out.push(s); return out.join('\r\n');
+}
+function vevent(ev) {
+  const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+  const d = firstOccurrence(ev).replace(/-/g, '');
+  const l = ['BEGIN:VEVENT', `UID:${ev.id}@dyrevernkalenderen`, `DTSTAMP:${stamp}`];
+  if (ev.start_time) {
+    let end = ev.end_time;
+    if (!end) { const [h, mi] = ev.start_time.split(':').map(Number); end = `${pad((h + 2) % 24)}:${pad(mi)}`; }
+    l.push(`DTSTART;TZID=Europe/Oslo:${d}T${hhmm(ev.start_time).replace(':','')}00`);
+    l.push(`DTEND;TZID=Europe/Oslo:${d}T${hhmm(end).replace(':','')}00`);
+  } else {
+    l.push(`DTSTART;VALUE=DATE:${d}`);
+    l.push(`DTEND;VALUE=DATE:${iso(addDays(parseISO(firstOccurrence(ev)), 1)).replace(/-/g,'')}`);
+  }
+  if (ev.recurrence === 'weekly') {
+    let r = `RRULE:FREQ=WEEKLY;BYDAY=${(ev.weekdays || []).map(w => BYDAY[w]).join(',')}`;
+    if (ev.recur_until) r += `;UNTIL=${ev.recur_until.replace(/-/g,'')}T235959Z`;
+    l.push(r);
+  }
+  l.push(`SUMMARY:${icsEsc(ev.title)}`);
+  const loc = [ev.location, ev.city !== NATIONAL ? ev.city : ''].filter(Boolean).join(', ');
+  if (loc) l.push(`LOCATION:${icsEsc(loc)}`);
+  const desc = [ev.description, ev.organizer ? 'Arrangør: ' + ev.organizer : '', ev.url || '', 'Fra Dyrevernkalenderen'].filter(Boolean).join('\n\n');
+  l.push(`DESCRIPTION:${icsEsc(desc)}`);
+  if (ev.url) l.push(`URL:${ev.url}`);
+  l.push(`CATEGORIES:${icsEsc(catOf(ev).label)}`);
+  l.push('END:VEVENT');
+  return l;
+}
+function icsFile(list, name) {
+  const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Dyrevernkalenderen//NO', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH', `X-WR-CALNAME:${icsEsc(name)}`, 'X-WR-TIMEZONE:Europe/Oslo'];
+  for (const ev of list) lines.push(...vevent(ev));
+  lines.push('END:VCALENDAR');
+  return lines.map(fold).join('\r\n') + '\r\n';
+}
+
+/* ---------- Identitet (navn + e-post) ---------- */
+function askIdentity(title, hint) {
+  return new Promise(resolve => {
+    const dlg = $('#dlg-identity'), form = $('#form-identity');
+    const saved = identity.get() || {};
+    $('#id-title').textContent = title; $('#id-hint').textContent = hint;
+    $('#i-name').value = saved.name || ''; $('#i-email').value = saved.email || ''; $('#id-err').textContent = '';
+    const done = v => { dlg.removeEventListener('close', onClose); form.onsubmit = null; if (dlg.open) dlg.close(); resolve(v); };
+    const onClose = () => done(null);
+    form.onsubmit = e => {
+      e.preventDefault();
+      const name = $('#i-name').value.trim(), email = $('#i-email').value.trim().toLowerCase();
+      if (name.length < 2) return $('#id-err').textContent = 'Skriv inn navnet ditt.';
+      if (!validEmail(email)) return $('#id-err').textContent = 'Skriv inn en gyldig e-postadresse.';
+      identity.set({ name, email }); done({ name, email });
+    };
+    dlg.addEventListener('close', onClose);
+    dlg.showModal();
+  });
+}
+
+/* ---------- Handlinger ---------- */
+async function reload() {
+  try { events = await db.load(); }
+  catch (e) { toast('Klarte ikke hente arrangementer: ' + friendlyError(e), 6000); console.error(e); }
+  render();
+}
+async function doApprove(id) {
+  const who = await askIdentity('Godkjenn arrangement', 'Navnet ditt vises ikke. E-posten brukes bare for å sikre én godkjenning per person.');
+  if (!who) return;
+  try {
+    await db.approve(id, who.name, who.email);
+    await reload();
+    const ev = events.find(e => e.id === id);
+    toast(ev?.approved ? '🎉 Arrangementet er nå godkjent!' : `Takk! ${ev ? ev.approval_count : ''} av 3 godkjenninger.`);
+    if (ev) openEvent(id, $('#dlg-event').dataset.date);
+  } catch (e) { toast(friendlyError(e), 5000); }
+}
+function doReport(id) {
+  const dlg = $('#dlg-report'), form = $('#form-report');
+  $('#r-email').value = (identity.get() || {}).email || ''; $('#r-text').value = ''; $('#r-err').textContent = '';
+  form.onsubmit = async e => {
+    e.preventDefault();
+    const email = $('#r-email').value.trim().toLowerCase();
+    if (!validEmail(email)) return $('#r-err').textContent = 'Skriv inn en gyldig e-postadresse.';
+    const reason = [$('#r-reason').value, $('#r-text').value.trim()].filter(Boolean).join(': ');
+    $('#r-submit').disabled = true;
+    try { await db.report(id, email, reason); dlg.close(); $('#dlg-event').close(); toast('Takk, rapporten er registrert.'); await reload(); }
+    catch (err) { $('#r-err').textContent = friendlyError(err); }
+    finally { $('#r-submit').disabled = false; }
+  };
+  dlg.showModal();
+}
+function openNew(date) {
+  const saved = identity.get() || {};
+  $('#f-name').value = saved.name || ''; $('#f-email').value = saved.email || '';
+  $('#f-title').value = ''; $('#f-location').value = ''; $('#f-organizer').value = ''; $('#f-url').value = ''; $('#f-desc').value = '';
+  $('#f-date').value = date || (selectedDay >= todayISO ? selectedDay : todayISO); $('#f-start').value = ''; $('#f-end').value = '';
+  $('#f-recurring').checked = false; $('#recur-fields').hidden = true; $('#f-until').value = '';
+  document.querySelectorAll('#weekday-picks input').forEach(i => i.checked = false);
+  $('#f-city').value = city; $('#f-category').value = 'annet'; $('#form-err').textContent = '';
+  $('#dlg-new').showModal();
+}
+async function submitNew(e) {
+  e.preventDefault();
+  const err = $('#form-err'); err.textContent = '';
+  const name = $('#f-name').value.trim(), email = $('#f-email').value.trim().toLowerCase();
+  const title = $('#f-title').value.trim(), start_date = $('#f-date').value;
+  const start_time = $('#f-start').value || null, end_time = $('#f-end').value || null;
+  const recurring = $('#f-recurring').checked;
+  const weekdays = [...document.querySelectorAll('#weekday-picks input:checked')].map(i => Number(i.value));
+  const url = $('#f-url').value.trim();
+  if (name.length < 2) return err.textContent = 'Skriv inn navnet ditt.';
+  if (!validEmail(email)) return err.textContent = 'Skriv inn en gyldig e-postadresse.';
+  if (title.length < 3) return err.textContent = 'Tittelen må ha minst 3 tegn.';
+  if (!start_date) return err.textContent = 'Velg en dato.';
+  if (start_time && end_time && end_time <= start_time) return err.textContent = 'Sluttid må være etter starttid.';
+  if (recurring && !weekdays.length) return err.textContent = 'Velg minst én ukedag.';
+  if (recurring && $('#f-until').value && $('#f-until').value < start_date) return err.textContent = 'Siste dato må være etter startdato.';
+  if (url && !/^https?:\/\/.+/.test(url)) return err.textContent = 'Lenken må starte med http:// eller https://';
+  const row = {
+    title, category: $('#f-category').value, city: $('#f-city').value,
+    location: $('#f-location').value.trim() || null, organizer: $('#f-organizer').value.trim() || null,
+    url: url || null, description: $('#f-desc').value.trim() || null,
+    start_date, start_time, end_time,
+    recurrence: recurring ? 'weekly' : null, weekdays: recurring ? weekdays : null,
+    recur_until: recurring && $('#f-until').value ? $('#f-until').value : null,
+    submitter_name: name, submitter_email: email
+  };
+  $('#f-submit').disabled = true;
+  try {
+    await db.addEvent(row); identity.set({ name, email });
+    $('#dlg-new').close(); toast('Takk! Forslaget er lagt inn og venter på godkjenning.', 5000);
+    if (row.city !== city && row.city !== NATIONAL) { city = row.city; $('#city').value = city; try { localStorage.setItem('dvk_city', city); } catch {} }
+    selectedDay = start_date; cursor = new Date(parseISO(start_date).getFullYear(), parseISO(start_date).getMonth(), 1);
+    await reload();
+  } catch (ex) { err.textContent = friendlyError(ex); }
+  finally { $('#f-submit').disabled = false; }
+}
+
+/* ---------- Oppstart ---------- */
+function init() {
+  db.init();
+  if (!db.live) {
+    $('#banner').hidden = false;
+    $('#banner .wrap').textContent = 'Databasen er ikke koblet til ennå – dette er eksempeldata. Følg OPPSETT.md for å koble til Supabase.';
+  }
+  // By-velger
+  const citySel = $('#city');
+  citySel.innerHTML = CITIES.map(c => `<option>${esc(c)}</option>`).join('');
+  if (!CITIES.includes(city)) city = 'Oslo';
+  citySel.value = city;
+  citySel.onchange = () => { city = citySel.value; try { localStorage.setItem('dvk_city', city); } catch {} render(); };
+  // Skjema-lister
+  $('#f-category').innerHTML = Object.entries(CATEGORIES).map(([k, v]) => `<option value="${k}">${esc(v.label)}</option>`).join('');
+  $('#f-city').innerHTML = [...CITIES, NATIONAL].map(c => `<option>${esc(c)}</option>`).join('');
+  $('#weekday-picks').innerHTML = [1,2,3,4,5,6,0].map(w => `<label><input type="checkbox" value="${w}"><span>${WEEKDAY_SHORT[w]}</span></label>`).join('');
+  $('#legend').innerHTML = Object.values(CATEGORIES).map(c => `<span style="--c:${c.color}"><i></i>${esc(c.label)}</span>`).join('');
+  $('#f-recurring').onchange = e => { $('#recur-fields').hidden = !e.target.checked; };
+  $('#form-new').onsubmit = submitNew;
+  // Navigasjon
+  document.querySelectorAll('.seg button').forEach(b => b.onclick = () => { view = b.dataset.view; render(); });
+  $('#prev').onclick = () => { cursor.setMonth(cursor.getMonth() - 1); render(); };
+  $('#next').onclick = () => { cursor.setMonth(cursor.getMonth() + 1); render(); };
+  $('#more').onclick = () => { listMonths += 6; render(); };
+  $('#btn-new').onclick = () => openNew(); $('#fab').onclick = () => openNew();
+  $('#btn-export').onclick = () => {
+    const list = events.filter(ev => ev.approved && inCity(ev) && (ev.recurrence || ev.start_date >= todayISO));
+    if (!list.length) return toast('Ingen godkjente arrangementer å eksportere.');
+    download(`dyrevernkalenderen-${city.toLowerCase().replace(/[^a-z0-9]+/g,'-')}.ics`, icsFile(list, 'Dyrevernkalenderen – ' + city));
+  };
+  document.querySelectorAll('dialog [data-close]').forEach(b => b.onclick = () => b.closest('dialog').close());
+  document.querySelectorAll('dialog').forEach(d => d.addEventListener('click', e => { if (e.target === d) d.close(); }));
+  // Klikk i kalender/liste
+  document.body.addEventListener('click', e => {
+    const cell = e.target.closest('.cell');
+    if (cell) { selectedDay = cell.dataset.date; const d = parseISO(selectedDay); if (d.getMonth() !== cursor.getMonth()) cursor = new Date(d.getFullYear(), d.getMonth(), 1); render(); $('#day-list').scrollIntoView({ behavior:'smooth', block:'nearest' }); return; }
+    const card = e.target.closest('.card');
+    if (card) { openEvent(card.dataset.id, card.dataset.date); return; }
+    if (e.target.closest('[data-new]')) { e.preventDefault(); openNew(); return; }
+    const dlg = $('#dlg-event'); const ev = events.find(x => x.id === dlg.dataset.id); const date = dlg.dataset.date;
+    if (e.target.closest('[data-approve]')) return doApprove(e.target.closest('[data-approve]').dataset.approve);
+    if (e.target.closest('[data-report]')) return doReport(e.target.closest('[data-report]').dataset.report);
+    if (e.target.closest('[data-copy-link]') && ev) return copyText(shareURL(ev, date)).then(ok => toast(ok ? 'Lenke kopiert!' : 'Kunne ikke kopiere.'));
+    if (e.target.closest('[data-copy-text]') && ev) return copyText(shareText(ev, date)).then(ok => toast(ok ? 'Tekst kopiert – lim inn i Instagram, Facebook e.l.' : 'Kunne ikke kopiere.'));
+    if (e.target.closest('[data-ics]') && ev) return download(`${ev.title.toLowerCase().replace(/[^a-zæøå0-9]+/g,'-')}.ics`, icsFile([ev], ev.title));
+  });
+  // Delt lenke
+  reload().then(() => {
+    const p = new URLSearchParams(location.search);
+    if (p.get('event')) {
+      const ev = events.find(x => x.id === p.get('event'));
+      if (ev) {
+        if (ev.city !== NATIONAL && ev.city !== city && CITIES.includes(ev.city)) { city = ev.city; $('#city').value = city; render(); }
+        openEvent(ev.id, p.get('date') || undefined);
+      } else toast('Fant ikke arrangementet – det kan være fjernet.');
+    }
+  });
+}
+init();
+</script>
+</body>
+</html>
