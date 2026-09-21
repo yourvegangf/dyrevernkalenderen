@@ -8,34 +8,20 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   :root {
-    --bg: #f6f5f0;
+    --bg: #eef4ea;
     --surface: #ffffff;
-    --surface-2: #efede6;
-    --text: #1d1d1b;
-    --muted: #6c6b65;
-    --border: #dedbd1;
-    --accent: #2f7a4f;
-    --accent-hover: #256640;
+    --surface-2: #e1ecda;
+    --text: #1f2a22;
+    --muted: #5f7364;
+    --border: #cfdfc7;
+    --accent: #3a8a5c;
+    --accent-hover: #2f7049;
     --on-accent: #ffffff;
-    --pending: #b3600a;
+    --pending: #c26d12;
     --danger: #b42318;
-    --today: #2f7a4f;
+    --today: #3a8a5c;
     --radius: 12px;
-    --shadow: 0 6px 24px rgba(0,0,0,.10);
-  }
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) {
-      --bg: #141513; --surface: #1e1f1c; --surface-2: #262823; --text: #ebeae4;
-      --muted: #a4a39b; --border: #34362f; --accent: #55b07f; --accent-hover: #6cc292;
-      --on-accent: #0f1a13; --pending: #e0902f; --danger: #f0665b; --today: #55b07f;
-      --shadow: 0 6px 24px rgba(0,0,0,.5);
-    }
-  }
-  :root[data-theme="dark"] {
-    --bg: #141513; --surface: #1e1f1c; --surface-2: #262823; --text: #ebeae4;
-    --muted: #a4a39b; --border: #34362f; --accent: #55b07f; --accent-hover: #6cc292;
-    --on-accent: #0f1a13; --pending: #e0902f; --danger: #f0665b; --today: #55b07f;
-    --shadow: 0 6px 24px rgba(0,0,0,.5);
+    --shadow: 0 6px 24px rgba(40,80,50,.12);
   }
 
   * { box-sizing: border-box; }
@@ -69,12 +55,20 @@
   }
 
   .banner {
-    background: #fff4d6; color: #5a3d00; border-bottom: 1px solid #f0d78a;
+      background: #f6faf3; border-bottom: 1px solid var(--border);
     font-size: .9rem; padding: 8px 0;
   }
   :root[data-theme="dark"] .banner { background: #3a2d0c; color: #ffd98a; border-color: #5a4614; }
   @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .banner { background: #3a2d0c; color: #ffd98a; border-color: #5a4614; } }
 
+    .hero { margin: 16px 0 4px; border-radius: 16px; overflow: hidden; position: relative; aspect-ratio: 16 / 6; background: var(--surface-2); }
+  .hero img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .hero figcaption {
+    position: absolute; left: 0; right: 0; bottom: 0; padding: 28px 18px 14px;
+    color: #fff; font-weight: 700; font-size: 1.15rem; text-shadow: 0 1px 4px rgba(0,0,0,.4);
+    background: linear-gradient(to top, rgba(20,40,25,.65), transparent);
+  }
+  @media (max-width: 699px) { .hero { aspect-ratio: 4 / 3; border-radius: 12px; } }
   .toolbar { display: flex; align-items: center; gap: 10px; padding: 14px 0 6px; flex-wrap: wrap; }
   .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 999px; overflow: hidden; background: var(--surface); }
   .seg button { border: 0; background: transparent; padding: 8px 16px; font-weight: 600; color: var(--muted); }
@@ -86,8 +80,7 @@
   .btn:hover { border-color: var(--muted); }
   .btn.primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
   .btn.primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
-  .btn.danger { color: var(--danger); }
-  .btn.small { padding: 6px 12px; font-size: .9rem; }
+
   .spacer { flex: 1; }
 
   /* Måned */
@@ -221,6 +214,10 @@
 <div id="banner" class="banner" hidden><div class="wrap"></div></div>
 
 <div class="wrap">
+    <figure class="hero">
+    <img src="bilde.jpg" alt="En and i en elv">
+    <figcaption>Sammen for dyra – finn noe å bli med på!</figcaption>
+  </figure>
   <div class="toolbar">
     <div class="seg" role="tablist">
       <button data-view="month" class="active">Måned</button>
