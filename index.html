@@ -882,11 +882,14 @@ function askIdentity(title, hint) {
 /* ---------- Handlinger ---------- */
 async function reload() {
   try {
-    const [evs, ovs] = await Promise.all([db.load(), db.loadOverrides()]);
-    events = evs;
-    overrideMap = {};
-    for (const o of ovs) overrideMap[o.event_id + '|' + o.occurrence_date] = o;
+    events = await db.load();
   } catch (e) { toast('Klarte ikke hente arrangementer: ' + friendlyError(e), 6000); console.error(e); }
+  // Unntak for enkeltdager er en ekstra finesse – feiler de, skal resten
+  // av kalenderen fortsatt vises.
+  try {
+    overrideMap = {};
+    for (const o of await db.loadOverrides()) overrideMap[o.event_id + '|' + o.occurrence_date] = o;
+  } catch (e) { overrideMap = {}; console.warn('Kunne ikke hente endringer på enkeltdager:', e); }
   render();
 }
 async function doApprove(id) {
