@@ -41,7 +41,7 @@
 
   header.top {
     position: sticky; top: 0; z-index: 5;
-    background: var(--surface); border-bottom: 1px solid var(--border);
+    background: #f6faf3; border-bottom: 1px solid var(--border);
   }
   header.top .wrap { display: flex; align-items: center; gap: 12px; padding: 12px 16px; }
   header.top h1 { font-size: 1.15rem; letter-spacing: -.01em; flex: 1; white-space: nowrap; }
@@ -55,11 +55,9 @@
   }
 
   .banner {
-      background: #f6faf3; border-bottom: 1px solid var(--border);
+    background: #fff4d6; color: #5a3d00; border-bottom: 1px solid #f0d78a;
     font-size: .9rem; padding: 8px 0;
   }
-  :root[data-theme="dark"] .banner { background: #3a2d0c; color: #ffd98a; border-color: #5a4614; }
-  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .banner { background: #3a2d0c; color: #ffd98a; border-color: #5a4614; } }
 
     .hero { margin: 16px 0 4px; border-radius: 16px; overflow: hidden; position: relative; aspect-ratio: 16 / 6; background: var(--surface-2); }
   .hero img { width: 100%; height: 100%; object-fit: cover; display: block; }
@@ -80,7 +78,8 @@
   .btn:hover { border-color: var(--muted); }
   .btn.primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
   .btn.primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
-
+  .btn.danger { color: var(--danger); }
+  .btn.small { padding: 6px 12px; font-size: .9rem; }
   .spacer { flex: 1; }
 
   /* Måned */
@@ -184,6 +183,31 @@
   .err { color: var(--danger); font-size: .9rem; margin: 6px 0; }
   .hint { color: var(--muted); font-size: .85rem; }
 
+  .editlink-box {
+    margin: 14px 0; padding: 14px; border-radius: 10px;
+    background: color-mix(in srgb, var(--accent) 8%, transparent); border: 1px solid var(--accent);
+  }
+  .editlink-box strong { color: var(--accent-hover); }
+  .editlink-box input {
+    width: 100%; margin-top: 8px; padding: 9px 10px; border: 1px solid var(--border);
+    border-radius: 8px; background: var(--surface); font-size: .8rem; font-family: ui-monospace, monospace;
+  }
+  .mine { font-size: .72rem; font-weight: 700; padding: 1px 8px; border-radius: 999px; background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent-hover); }
+
+  /* Avlyst enkeltdag */
+  .badge.off { background: color-mix(in srgb, var(--danger) 14%, transparent); color: var(--danger); }
+  .card.off .body h4 { text-decoration: line-through; }
+  .card.off { opacity: .72; }
+  .card.off .bar { background: repeating-linear-gradient(45deg, var(--danger) 0 4px, transparent 4px 8px); }
+  .chip.off { text-decoration: line-through; opacity: .6; }
+  .dot.off { background: var(--danger); opacity: .45; }
+  .changed { font-size: .72rem; font-weight: 700; padding: 1px 8px; border-radius: 999px; background: color-mix(in srgb, var(--pending) 14%, transparent); color: var(--pending); }
+  .off-box {
+    margin: 12px 0; padding: 12px; border-radius: 10px;
+    background: color-mix(in srgb, var(--danger) 8%, transparent); border: 1px solid var(--danger);
+  }
+  .off-box strong { color: var(--danger); }
+
   .toast {
     position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%) translateY(20px);
     background: var(--text); color: var(--bg); padding: 10px 18px; border-radius: 999px;
@@ -249,6 +273,7 @@
   <footer>
     <div class="legend" id="legend"></div>
     <p>Alle kan foreslå arrangementer. Et forslag blir synlig som «venter» med én gang, og godkjent når tre andre personer har godkjent det. Forslag som ikke får tre godkjenninger innen 14 dager, fjernes. Arrangementer merket «Nasjonalt / digitalt» vises i alle byer.</p>
+    <p>Når du sender inn et arrangement, får du en hemmelig redigeringslenke. Med den kan du rette opplysninger eller slette arrangementet senere – også fra en annen enhet. Ta vare på den.</p>
     <p>Vil du ha kalenderen i din egen kalender-app? Trykk «.ics» øverst for å laste ned alle godkjente arrangementer i valgt by, eller last ned ett arrangement om gangen.</p>
   </footer>
 </div>
@@ -263,10 +288,10 @@
 
 <!-- Nytt arrangement -->
 <dialog id="dlg-new">
-  <div class="dlg-head"><h2>Foreslå arrangement</h2><button class="close" data-close aria-label="Lukk">✕</button></div>
+  <div class="dlg-head"><h2 id="new-title">Foreslå arrangement</h2><button class="close" data-close aria-label="Lukk">✕</button></div>
   <div class="dlg-body">
     <form id="form-new" novalidate>
-      <div class="row two">
+      <div class="row two" id="f-identity">
         <div class="row"><label for="f-name">Ditt navn</label><input id="f-name" type="text" required maxlength="80" autocomplete="name"></div>
         <div class="row"><label for="f-email">Din e-post <small>(vises ikke)</small></label><input id="f-email" type="email" required autocomplete="email"></div>
       </div>
@@ -297,8 +322,66 @@
       <div class="row"><label for="f-url">Lenke <small>(Facebook-arrangement, nettside …)</small></label><input id="f-url" type="url" maxlength="500" placeholder="https://"></div>
       <div class="row"><label for="f-desc">Beskrivelse</label><textarea id="f-desc" maxlength="2000"></textarea></div>
       <div class="err" id="form-err"></div>
-      <p class="hint">Forslaget vises som «venter» med en gang, og blir godkjent når tre andre personer har godkjent det.</p>
+      <p class="hint" id="f-hint">Forslaget vises som «venter» med en gang, og blir godkjent når tre andre personer har godkjent det.</p>
       <div class="actions"><button type="submit" class="btn primary" id="f-submit">Send inn forslag</button><button type="button" class="btn" data-close>Avbryt</button></div>
+    </form>
+  </div>
+</dialog>
+
+<!-- Kvittering med redigeringslenke -->
+<dialog id="dlg-saved">
+  <div class="dlg-head"><h2 id="saved-title">Takk! Forslaget er lagt inn</h2><button class="close" data-close aria-label="Lukk">✕</button></div>
+  <div class="dlg-body">
+    <p id="saved-intro">Arrangementet vises nå som «venter på godkjenning». Så snart tre andre personer har godkjent det, blir det bekreftet i kalenderen.</p>
+    <div class="editlink-box">
+      <strong>🔑 Ta vare på denne lenken</strong>
+      <p class="hint" style="margin:6px 0 0">Med den kan du rette opplysninger eller slette arrangementet senere. Lenken er hemmelig – del den bare med noen som skal kunne endre arrangementet.</p>
+      <input id="saved-link" type="text" readonly aria-label="Redigeringslenke">
+      <div class="actions">
+        <button type="button" class="btn primary" id="saved-copy">🔗 Kopier lenken</button>
+        <button type="button" class="btn" data-close>Lukk</button>
+      </div>
+    </div>
+    <p class="hint">Nettleseren din husker lenken, så du ser «Rediger» på arrangementet ditt så lenge du bruker samme enhet. Bytter du enhet, eller tømmer nettleserdata, trenger du lenken.</p>
+  </div>
+</dialog>
+
+<!-- Denne dagen eller hele serien? -->
+<dialog id="dlg-scope">
+  <div class="dlg-head"><h2>Hva vil du endre?</h2><button class="close" data-close aria-label="Lukk">✕</button></div>
+  <div class="dlg-body">
+    <p class="hint" id="scope-hint"></p>
+    <div class="actions" style="flex-direction:column;align-items:stretch">
+      <button type="button" class="btn primary" id="scope-one"></button>
+      <button type="button" class="btn" id="scope-all">↻ Hele serien – alle datoer</button>
+      <button type="button" class="btn" data-close>Avbryt</button>
+    </div>
+  </div>
+</dialog>
+
+<!-- Endre én enkelt dag -->
+<dialog id="dlg-occurrence">
+  <div class="dlg-head"><h2 id="occ-title">Endre denne dagen</h2><button class="close" data-close aria-label="Lukk">✕</button></div>
+  <div class="dlg-body">
+    <form id="form-occurrence" novalidate>
+      <p class="hint" id="occ-hint"></p>
+      <div class="row">
+        <label class="check"><input id="o-cancelled" type="checkbox"> Avlys denne dagen</label>
+      </div>
+      <div id="occ-fields">
+        <div class="row two">
+          <div class="row"><label for="o-start">Starter <small>(tomt = som serien)</small></label><input id="o-start" type="time"></div>
+          <div class="row"><label for="o-end">Slutter <small>(tomt = som serien)</small></label><input id="o-end" type="time"></div>
+        </div>
+        <div class="row"><label for="o-location">Sted <small>(tomt = som serien)</small></label><input id="o-location" type="text" maxlength="200"></div>
+        <div class="row"><label for="o-desc">Beskrivelse <small>(tomt = som serien)</small></label><textarea id="o-desc" maxlength="2000"></textarea></div>
+      </div>
+      <div class="err" id="occ-err"></div>
+      <div class="actions">
+        <button type="submit" class="btn primary" id="o-submit">Lagre denne dagen</button>
+        <button type="button" class="btn" id="o-reset" hidden>↺ Tilbakestill til serien</button>
+        <button type="button" class="btn" data-close>Avbryt</button>
+      </div>
     </form>
   </div>
 </dialog>
@@ -369,7 +452,7 @@ const WEEKDAY_SHORT = ['sø','ma','ti','on','to','fr','lø'];
 const WEEKDAY_LONG  = ['søndag','mandag','tirsdag','onsdag','torsdag','fredag','lørdag'];
 const BYDAY = ['SU','MO','TU','WE','TH','FR','SA'];
 const PENDING_DAYS = 14;
-const EVENT_COLUMNS = 'id,created_at,title,description,category,city,location,organizer,url,start_date,start_time,end_time,recurrence,weekdays,recur_until,submitter_name,approved,approval_count';
+const EVENT_COLUMNS = 'id,created_at,edited_at,title,description,category,city,location,organizer,url,start_date,start_time,end_time,recurrence,weekdays,recur_until,submitter_name,approved,approval_count';
 
 /* ---------- Hjelpere ---------- */
 const $ = s => document.querySelector(s);
@@ -382,6 +465,7 @@ const hhmm = t => t ? t.slice(0,5) : '';
 const todayISO = iso(new Date());
 const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
 const fmtLong = s => cap(new Intl.DateTimeFormat('nb-NO', { weekday:'long', day:'numeric', month:'long' }).format(parseISO(s)));
+const fmtLongLc = s => fmtLong(s).toLowerCase();   // midt i en setning
 const fmtLongYear = s => cap(new Intl.DateTimeFormat('nb-NO', { weekday:'long', day:'numeric', month:'long', year:'numeric' }).format(parseISO(s)));
 const timeRange = ev => ev.start_time ? (hhmm(ev.start_time) + (ev.end_time ? '–' + hhmm(ev.end_time) : '')) : 'Hele dagen';
 const catOf = ev => CATEGORIES[ev.category] || CATEGORIES.annet;
@@ -405,6 +489,13 @@ function download(name, content, type = 'text/calendar;charset=utf-8') {
 const identity = {
   get() { try { return JSON.parse(localStorage.getItem('dvk_identity') || 'null'); } catch { return null; } },
   set(v) { try { localStorage.setItem('dvk_identity', JSON.stringify(v)); } catch {} }
+};
+/* Redigeringsnøkler for arrangementer denne nettleseren har sendt inn */
+const tokens = {
+  all() { try { return JSON.parse(localStorage.getItem('dvk_tokens') || '{}'); } catch { return {}; } },
+  get(id) { return this.all()[id] || null; },
+  set(id, token) { try { const a = this.all(); a[id] = token; localStorage.setItem('dvk_tokens', JSON.stringify(a)); } catch {} },
+  remove(id) { try { const a = this.all(); delete a[id]; localStorage.setItem('dvk_tokens', JSON.stringify(a)); } catch {} }
 };
 
 /* ---------- Database (Supabase, eller demo når ikke satt opp) ---------- */
@@ -431,9 +522,69 @@ const db = {
     if (error) throw error;
     return data;
   },
+  async loadOverrides() {
+    if (!this.live) return (this.demoOverrides || []).slice();
+    const { data, error } = await this.client.from('event_overrides')
+      .select('event_id,occurrence_date,cancelled,start_time,end_time,location,description');
+    if (error) throw error;
+    return data;
+  },
+  async setOccurrence(eventId, token, date, o) {
+    if (!this.live) {
+      this.demoOverrides = (this.demoOverrides || []).filter(x => !(x.event_id === eventId && x.occurrence_date === date));
+      this.demoOverrides.push({ event_id: eventId, occurrence_date: date, ...o });
+      return;
+    }
+    const { error } = await this.client.rpc('set_occurrence', {
+      p_event_id: eventId, p_token: token, p_date: date,
+      p_cancelled: o.cancelled, p_start_time: o.start_time, p_end_time: o.end_time,
+      p_location: o.location, p_description: o.description
+    });
+    if (error) throw error;
+  },
+  async clearOccurrence(eventId, token, date) {
+    if (!this.live) {
+      this.demoOverrides = (this.demoOverrides || []).filter(x => !(x.event_id === eventId && x.occurrence_date === date));
+      return;
+    }
+    const { error } = await this.client.rpc('clear_occurrence', { p_event_id: eventId, p_token: token, p_date: date });
+    if (error) throw error;
+  },
+  rowToParams(row) {
+    return {
+      p_title: row.title, p_description: row.description, p_category: row.category, p_city: row.city,
+      p_location: row.location, p_organizer: row.organizer, p_url: row.url,
+      p_start_date: row.start_date, p_start_time: row.start_time, p_end_time: row.end_time,
+      p_recurrence: row.recurrence, p_weekdays: row.weekdays, p_recur_until: row.recur_until
+    };
+  },
   async addEvent(row) {
-    if (!this.live) { this.demo.push({ ...row, id:'demo-'+Date.now(), created_at:new Date().toISOString(), approved:false, approval_count:0 }); return; }
-    const { error } = await this.client.from('events').insert(row);
+    if (!this.live) {
+      const id = 'demo-' + Date.now();
+      this.demo.push({ ...row, id, created_at:new Date().toISOString(), edited_at:null, approved:false, approval_count:0 });
+      return { id, edit_token: 'demo-token-' + id };
+    }
+    const { data, error } = await this.client.rpc('submit_event', {
+      ...this.rowToParams(row), p_submitter_name: row.submitter_name, p_submitter_email: row.submitter_email
+    });
+    if (error) throw error;
+    return data;
+  },
+  async updateEvent(id, token, row) {
+    if (!this.live) {
+      const ev = this.demo.find(e => e.id === id);
+      const reset = ev.approved && ev.title !== row.title;
+      Object.assign(ev, row, { edited_at: new Date().toISOString() });
+      if (reset) { ev.approved = false; ev.approval_count = 0; }
+      return { reset };
+    }
+    const { data, error } = await this.client.rpc('update_event', { p_id: id, p_token: token, ...this.rowToParams(row) });
+    if (error) throw error;
+    return data;
+  },
+  async deleteEvent(id, token) {
+    if (!this.live) { this.demo = this.demo.filter(e => e.id !== id); return; }
+    const { error } = await this.client.rpc('delete_event', { p_id: id, p_token: token });
     if (error) throw error;
   },
   async approve(eventId, name, email) {
@@ -456,6 +607,7 @@ function friendlyError(e) {
 
 /* ---------- Tilstand ---------- */
 let events = [];
+let overrideMap = {};   // "arrangementId|dato" → unntak for den ene dagen
 let city = (() => { try { return localStorage.getItem('dvk_city'); } catch { return null; } })() || 'Oslo';
 let view = 'month';
 let cursor = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
@@ -477,11 +629,26 @@ function instances(ev, from, to) {
   for (; d <= end; d = addDays(d, 1)) if (days.includes(d.getDay())) out.push({ ev, date: iso(d) });
   return out;
 }
+/* Unntak for én enkelt dag i en serie */
+function overrideFor(eventId, date) { return overrideMap[eventId + '|' + date] || null; }
+/* Arrangementet slik det faktisk ser ut på en bestemt dato */
+function effective(ev, date) {
+  const o = overrideFor(ev.id, date);
+  if (!o) return ev;
+  return { ...ev,
+    start_time:  o.start_time  != null ? o.start_time  : ev.start_time,
+    end_time:    o.end_time    != null ? o.end_time    : ev.end_time,
+    location:    o.location    != null ? o.location    : ev.location,
+    description: o.description != null ? o.description : ev.description,
+    cancelled:   !!o.cancelled,
+    overridden:  true
+  };
+}
 function visibleInstances(from, to) {
   const list = [];
   for (const ev of events) {
     if (!inCity(ev) || isStale(ev)) continue;
-    list.push(...instances(ev, from, to));
+    for (const inst of instances(ev, from, to)) list.push({ ev: effective(ev, inst.date), date: inst.date });
   }
   list.sort((a, b) => a.date.localeCompare(b.date) || (a.ev.start_time || '').localeCompare(b.ev.start_time || '') || a.ev.title.localeCompare(b.ev.title));
   return list;
@@ -500,10 +667,10 @@ function nextOccurrence(ev) {
 /* ---------- Rendering ---------- */
 function cardHTML(inst) {
   const ev = inst.ev, cat = catOf(ev), pending = !ev.approved;
-  return `<article class="card ${pending ? 'pending' : ''}" data-id="${esc(ev.id)}" data-date="${inst.date}" style="--c:${cat.color}">
+  return `<article class="card ${pending ? 'pending' : ''} ${ev.cancelled ? 'off' : ''}" data-id="${esc(ev.id)}" data-date="${inst.date}" style="--c:${cat.color}">
     <div class="bar"></div>
     <div class="body">
-      <div class="meta"><span>${esc(timeRange(ev))}</span><span>·</span><span>${esc(cat.label)}</span>${pending ? `<span class="badge">Venter ${ev.approval_count}/3</span>` : ''}</div>
+      <div class="meta"><span>${esc(timeRange(ev))}</span><span>·</span><span>${esc(cat.label)}</span>${ev.cancelled ? `<span class="badge off">Avlyst</span>` : ''}${pending ? `<span class="badge">Venter ${ev.approval_count}/3</span>` : ''}</div>
       <h4>${esc(ev.title)}</h4>
       <div class="meta">${esc([ev.location, ev.city !== city ? ev.city : ''].filter(Boolean).join(' · '))}${ev.recurrence ? ' <span>↻ ukentlig</span>' : ''}</div>
     </div>
@@ -526,8 +693,8 @@ function renderMonth() {
   for (let i = 0; i < totalCells; i++) {
     const d = addDays(gridStart, i), s = iso(d), other = d.getMonth() !== m;
     const list = byDate[s] || [];
-    const chips = list.slice(0, 3).map(x => `<span class="chip ${x.ev.approved ? '' : 'pending'}" style="--c:${catOf(x.ev).color}">${esc(x.ev.title)}</span>`).join('');
-    const dots = list.slice(0, 6).map(x => `<i class="dot ${x.ev.approved ? '' : 'pending'}" style="--c:${catOf(x.ev).color}"></i>`).join('');
+    const chips = list.slice(0, 3).map(x => `<span class="chip ${x.ev.approved ? '' : 'pending'} ${x.ev.cancelled ? 'off' : ''}" style="--c:${catOf(x.ev).color}">${esc(x.ev.title)}</span>`).join('');
+    const dots = list.slice(0, 6).map(x => `<i class="dot ${x.ev.approved ? '' : 'pending'} ${x.ev.cancelled ? 'off' : ''}" style="--c:${catOf(x.ev).color}"></i>`).join('');
     html += `<button class="cell ${other ? 'other' : ''} ${s === todayISO ? 'today' : ''} ${s === selectedDay ? 'selected' : ''}" data-date="${s}" aria-label="${fmtLong(s)}">
       <span class="num">${d.getDate()}</span>
       ${dots ? `<span class="dots">${dots}</span>` : ''}${chips}${list.length > 3 ? `<span class="more">+${list.length - 3} til</span>` : ''}
@@ -561,6 +728,7 @@ function render() {
 
 /* ---------- Detaljvisning ---------- */
 function shareURL(ev, date) { return `${location.origin}${location.pathname}?event=${encodeURIComponent(ev.id)}&date=${date}`; }
+function editURL(id, token) { return `${location.origin}${location.pathname}?event=${encodeURIComponent(id)}&token=${encodeURIComponent(token)}`; }
 function shareText(ev, date) {
   const lines = [`🐾 ${ev.title}`, `📅 ${fmtLong(date)}${ev.start_time ? ' kl. ' + timeRange(ev) : ''}`];
   if (ev.location || ev.city !== NATIONAL) lines.push(`📍 ${[ev.location, ev.city].filter(Boolean).join(', ')}`);
@@ -570,21 +738,25 @@ function shareText(ev, date) {
   return lines.join('\n');
 }
 function openEvent(id, date) {
-  const ev = events.find(e => e.id === id); if (!ev) return;
-  date = date || nextOccurrence(ev);
+  const base = events.find(e => e.id === id); if (!base) return;
+  date = date || nextOccurrence(base);
+  const ev = effective(base, date);
   const cat = catOf(ev), pending = !ev.approved;
+  const recurring = ev.recurrence === 'weekly';
   $('#ev-title').textContent = ev.title;
   const recurText = ev.recurrence === 'weekly'
     ? `Hver ${(ev.weekdays || []).slice().sort((a,b) => ((a+6)%7)-((b+6)%7)).map(w => WEEKDAY_LONG[w]).join(' og ')}${ev.recur_until ? ' til ' + fmtLong(ev.recur_until) : ''}`
     : '';
+  const myToken = tokens.get(ev.id);
   $('#ev-body').innerHTML = `
-    <div><span class="badge cat" style="--c:${cat.color}">${esc(cat.label)}</span> ${pending ? `<span class="badge">Venter på godkjenning</span>` : ''}</div>
+    <div><span class="badge cat" style="--c:${cat.color}">${esc(cat.label)}</span> ${ev.cancelled ? `<span class="badge off">Avlyst denne dagen</span>` : ''} ${!ev.cancelled && ev.overridden ? `<span class="changed">Endret denne dagen</span>` : ''} ${pending ? `<span class="badge">Venter på godkjenning</span>` : ''} ${myToken ? `<span class="mine">Ditt arrangement</span>` : ''}</div>
+    ${ev.cancelled ? `<div class="off-box"><strong>⚠️ Avlyst ${esc(fmtLongLc(date))}</strong><p class="hint" style="margin:6px 0 0">Resten av serien går som normalt.</p></div>` : ''}
     <div class="kv">
       <span class="ic">📅</span><span><strong>${esc(fmtLongYear(date))}</strong>${ev.start_time ? ' kl. ' + esc(timeRange(ev)) : ''}${recurText ? `<br><span class="hint">↻ ${esc(recurText)}</span>` : ''}</span>
       <span class="ic">📍</span><span>${esc([ev.location, ev.city].filter(Boolean).join(', ') || 'Sted ikke oppgitt')}</span>
       ${ev.organizer ? `<span class="ic">👥</span><span>${esc(ev.organizer)}</span>` : ''}
       ${ev.url ? `<span class="ic">🔗</span><span><a href="${esc(ev.url)}" target="_blank" rel="noopener">${esc(ev.url.replace(/^https?:\/\//,'').slice(0,60))}</a></span>` : ''}
-      <span class="ic">✍️</span><span class="hint">Foreslått av ${esc(ev.submitter_name)}</span>
+      <span class="ic">✍️</span><span class="hint">Foreslått av ${esc(ev.submitter_name)}${ev.edited_at ? ` · endret ${esc(fmtLongYear(ev.edited_at.slice(0,10)))}` : ''}</span>
     </div>
     ${ev.description ? `<div class="desc">${esc(ev.description)}</div>` : ''}
     ${pending ? `<div class="approve-box">
@@ -592,6 +764,17 @@ function openEvent(id, date) {
         <div class="progress">${[0,1,2].map(i => `<i class="${i < ev.approval_count ? 'on' : ''}"></i>`).join('')}</div>
         <p class="hint" style="margin:6px 0 10px">Kjenner du til dette arrangementet og ser at det stemmer? Godkjenn det, så blir det synlig som bekreftet når tre personer har gjort det.</p>
         <button class="btn primary" data-approve="${esc(ev.id)}">✓ Godkjenn</button>
+      </div>` : ''}
+    ${myToken ? `<div class="editlink-box">
+        <strong>🔑 Dette arrangementet er ditt</strong>
+        <p class="hint" style="margin:6px 0 10px">${recurring
+          ? 'Du kan endre bare denne dagen, eller hele serien. Bytter du enhet, trenger du redigeringslenken.'
+          : 'Du kan rette opplysningene eller slette det. Bytter du enhet, trenger du redigeringslenken.'}</p>
+        <div class="actions" style="margin:0">
+          <button class="btn primary small" data-edit="${esc(ev.id)}">✏️ Rediger</button>
+          <button class="btn small" data-copy-editlink="${esc(ev.id)}">🔑 Kopier redigeringslenke</button>
+          <button class="btn small danger" data-delete="${esc(ev.id)}">🗑 Slett ${recurring ? 'hele serien' : ''}</button>
+        </div>
       </div>` : ''}
     <div class="actions">
       <button class="btn small" data-copy-link>🔗 Kopier lenke</button>
@@ -612,24 +795,25 @@ function fold(line) {
   while (s.length > 74) { out.push(s.slice(0, 74)); s = ' ' + s.slice(74); }
   out.push(s); return out.join('\r\n');
 }
-function vevent(ev) {
+const icsDate = s => s.replace(/-/g, '');
+const icsTime = t => hhmm(t).replace(':', '') + '00';
+/* Én VEVENT-blokk for et arrangement på en bestemt dato */
+function veventBody(ev, dateISO, opts = {}) {
   const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
-  const d = firstOccurrence(ev).replace(/-/g, '');
+  const d = icsDate(dateISO);
   const l = ['BEGIN:VEVENT', `UID:${ev.id}@dyrevernkalenderen`, `DTSTAMP:${stamp}`];
+  if (opts.recurrenceId) l.push(opts.recurrenceId);
   if (ev.start_time) {
     let end = ev.end_time;
     if (!end) { const [h, mi] = ev.start_time.split(':').map(Number); end = `${pad((h + 2) % 24)}:${pad(mi)}`; }
-    l.push(`DTSTART;TZID=Europe/Oslo:${d}T${hhmm(ev.start_time).replace(':','')}00`);
-    l.push(`DTEND;TZID=Europe/Oslo:${d}T${hhmm(end).replace(':','')}00`);
+    l.push(`DTSTART;TZID=Europe/Oslo:${d}T${icsTime(ev.start_time)}`);
+    l.push(`DTEND;TZID=Europe/Oslo:${d}T${icsTime(end)}`);
   } else {
     l.push(`DTSTART;VALUE=DATE:${d}`);
-    l.push(`DTEND;VALUE=DATE:${iso(addDays(parseISO(firstOccurrence(ev)), 1)).replace(/-/g,'')}`);
+    l.push(`DTEND;VALUE=DATE:${icsDate(iso(addDays(parseISO(dateISO), 1)))}`);
   }
-  if (ev.recurrence === 'weekly') {
-    let r = `RRULE:FREQ=WEEKLY;BYDAY=${(ev.weekdays || []).map(w => BYDAY[w]).join(',')}`;
-    if (ev.recur_until) r += `;UNTIL=${ev.recur_until.replace(/-/g,'')}T235959Z`;
-    l.push(r);
-  }
+  if (opts.rrule) l.push(opts.rrule);
+  if (opts.exdate) l.push(opts.exdate);
   l.push(`SUMMARY:${icsEsc(ev.title)}`);
   const loc = [ev.location, ev.city !== NATIONAL ? ev.city : ''].filter(Boolean).join(', ');
   if (loc) l.push(`LOCATION:${icsEsc(loc)}`);
@@ -639,6 +823,33 @@ function vevent(ev) {
   l.push(`CATEGORIES:${icsEsc(catOf(ev).label)}`);
   l.push('END:VEVENT');
   return l;
+}
+/* Hele arrangementet: serien, minus avlyste dager, pluss de dagene som er endret */
+function vevent(base) {
+  if (base.recurrence !== 'weekly') return veventBody(base, base.start_date);
+
+  const ovs = Object.values(overrideMap).filter(o => o.event_id === base.id);
+  const cancelled = ovs.filter(o => o.cancelled).map(o => o.occurrence_date);
+  const modified = ovs.filter(o => !o.cancelled);
+
+  let rrule = `RRULE:FREQ=WEEKLY;BYDAY=${(base.weekdays || []).map(w => BYDAY[w]).join(',')}`;
+  if (base.recur_until) rrule += `;UNTIL=${icsDate(base.recur_until)}T235959Z`;
+
+  let exdate = null;
+  if (cancelled.length) {
+    exdate = base.start_time
+      ? `EXDATE;TZID=Europe/Oslo:${cancelled.map(d => icsDate(d) + 'T' + icsTime(base.start_time)).join(',')}`
+      : `EXDATE;VALUE=DATE:${cancelled.map(icsDate).join(',')}`;
+  }
+
+  const out = veventBody(base, firstOccurrence(base), { rrule, exdate });
+  for (const o of modified) {
+    const recId = base.start_time
+      ? `RECURRENCE-ID;TZID=Europe/Oslo:${icsDate(o.occurrence_date)}T${icsTime(base.start_time)}`
+      : `RECURRENCE-ID;VALUE=DATE:${icsDate(o.occurrence_date)}`;
+    out.push(...veventBody(effective(base, o.occurrence_date), o.occurrence_date, { recurrenceId: recId }));
+  }
+  return out;
 }
 function icsFile(list, name) {
   const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Dyrevernkalenderen//NO', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH', `X-WR-CALNAME:${icsEsc(name)}`, 'X-WR-TIMEZONE:Europe/Oslo'];
@@ -670,8 +881,12 @@ function askIdentity(title, hint) {
 
 /* ---------- Handlinger ---------- */
 async function reload() {
-  try { events = await db.load(); }
-  catch (e) { toast('Klarte ikke hente arrangementer: ' + friendlyError(e), 6000); console.error(e); }
+  try {
+    const [evs, ovs] = await Promise.all([db.load(), db.loadOverrides()]);
+    events = evs;
+    overrideMap = {};
+    for (const o of ovs) overrideMap[o.event_id + '|' + o.occurrence_date] = o;
+  } catch (e) { toast('Klarte ikke hente arrangementer: ' + friendlyError(e), 6000); console.error(e); }
   render();
 }
 async function doApprove(id) {
@@ -700,8 +915,15 @@ function doReport(id) {
   };
   dlg.showModal();
 }
+let formMode = 'new', formEventId = null;
+
 function openNew(date) {
+  formMode = 'new'; formEventId = null;
   const saved = identity.get() || {};
+  $('#new-title').textContent = 'Foreslå arrangement';
+  $('#f-identity').hidden = false;
+  $('#f-submit').textContent = 'Send inn forslag';
+  $('#f-hint').textContent = 'Forslaget vises som «venter» med en gang, og blir godkjent når tre andre personer har godkjent det. Du får en lenke så du kan rette det senere.';
   $('#f-name').value = saved.name || ''; $('#f-email').value = saved.email || '';
   $('#f-title').value = ''; $('#f-location').value = ''; $('#f-organizer').value = ''; $('#f-url').value = ''; $('#f-desc').value = '';
   $('#f-date').value = date || (selectedDay >= todayISO ? selectedDay : todayISO); $('#f-start').value = ''; $('#f-end').value = '';
@@ -710,24 +932,58 @@ function openNew(date) {
   $('#f-city').value = city; $('#f-category').value = 'annet'; $('#form-err').textContent = '';
   $('#dlg-new').showModal();
 }
-async function submitNew(e) {
-  e.preventDefault();
+
+function openEdit(id) {
+  const ev = events.find(e => e.id === id); if (!ev) return;
+  if (!tokens.get(id)) return toast('Du har ikke redigeringslenken for dette arrangementet.');
+  formMode = 'edit'; formEventId = id;
+  $('#new-title').textContent = 'Rediger arrangement';
+  $('#f-identity').hidden = true;
+  $('#f-submit').textContent = 'Lagre endringer';
+  $('#f-hint').textContent = ev.approved
+    ? 'Endrer du tittelen på et godkjent arrangement, må det godkjennes på nytt. Alle andre endringer beholder godkjenningen.'
+    : 'Endringene blir synlige med en gang. Arrangementet venter fortsatt på godkjenning.';
+  $('#f-title').value = ev.title || '';
+  $('#f-category').value = ev.category || 'annet';
+  $('#f-city').value = ev.city || city;
+  $('#f-location').value = ev.location || '';
+  $('#f-organizer').value = ev.organizer || '';
+  $('#f-url').value = ev.url || '';
+  $('#f-desc').value = ev.description || '';
+  $('#f-date').value = ev.start_date || '';
+  $('#f-start').value = hhmm(ev.start_time);
+  $('#f-end').value = hhmm(ev.end_time);
+  const recurring = ev.recurrence === 'weekly';
+  $('#f-recurring').checked = recurring;
+  $('#recur-fields').hidden = !recurring;
+  $('#f-until').value = ev.recur_until || '';
+  document.querySelectorAll('#weekday-picks input').forEach(i => i.checked = recurring && (ev.weekdays || []).includes(Number(i.value)));
+  $('#form-err').textContent = '';
+  if ($('#dlg-event').open) $('#dlg-event').close();
+  $('#dlg-new').showModal();
+}
+
+/* Leser skjemaet og validerer. Returnerer null hvis noe er galt. */
+function readForm() {
   const err = $('#form-err'); err.textContent = '';
-  const name = $('#f-name').value.trim(), email = $('#f-email').value.trim().toLowerCase();
+  const fail = msg => { err.textContent = msg; return null; };
   const title = $('#f-title').value.trim(), start_date = $('#f-date').value;
   const start_time = $('#f-start').value || null, end_time = $('#f-end').value || null;
   const recurring = $('#f-recurring').checked;
   const weekdays = [...document.querySelectorAll('#weekday-picks input:checked')].map(i => Number(i.value));
   const url = $('#f-url').value.trim();
-  if (name.length < 2) return err.textContent = 'Skriv inn navnet ditt.';
-  if (!validEmail(email)) return err.textContent = 'Skriv inn en gyldig e-postadresse.';
-  if (title.length < 3) return err.textContent = 'Tittelen må ha minst 3 tegn.';
-  if (!start_date) return err.textContent = 'Velg en dato.';
-  if (start_time && end_time && end_time <= start_time) return err.textContent = 'Sluttid må være etter starttid.';
-  if (recurring && !weekdays.length) return err.textContent = 'Velg minst én ukedag.';
-  if (recurring && $('#f-until').value && $('#f-until').value < start_date) return err.textContent = 'Siste dato må være etter startdato.';
-  if (url && !/^https?:\/\/.+/.test(url)) return err.textContent = 'Lenken må starte med http:// eller https://';
-  const row = {
+  const name = $('#f-name').value.trim(), email = $('#f-email').value.trim().toLowerCase();
+  if (formMode === 'new') {
+    if (name.length < 2) return fail('Skriv inn navnet ditt.');
+    if (!validEmail(email)) return fail('Skriv inn en gyldig e-postadresse.');
+  }
+  if (title.length < 3) return fail('Tittelen må ha minst 3 tegn.');
+  if (!start_date) return fail('Velg en dato.');
+  if (start_time && end_time && end_time <= start_time) return fail('Sluttid må være etter starttid.');
+  if (recurring && !weekdays.length) return fail('Velg minst én ukedag.');
+  if (recurring && $('#f-until').value && $('#f-until').value < start_date) return fail('Siste dato må være etter startdato.');
+  if (url && !/^https?:\/\/.+/.test(url)) return fail('Lenken må starte med http:// eller https://');
+  return {
     title, category: $('#f-category').value, city: $('#f-city').value,
     location: $('#f-location').value.trim() || null, organizer: $('#f-organizer').value.trim() || null,
     url: url || null, description: $('#f-desc').value.trim() || null,
@@ -736,15 +992,132 @@ async function submitNew(e) {
     recur_until: recurring && $('#f-until').value ? $('#f-until').value : null,
     submitter_name: name, submitter_email: email
   };
+}
+
+function showSavedLink(id, isNew) {
+  const token = tokens.get(id); if (!token) return;
+  $('#saved-title').textContent = isNew ? 'Takk! Forslaget er lagt inn' : 'Endringene er lagret';
+  $('#saved-intro').textContent = isNew
+    ? 'Arrangementet vises nå som «venter på godkjenning». Så snart tre andre personer har godkjent det, blir det bekreftet i kalenderen.'
+    : 'Arrangementet er oppdatert i kalenderen.';
+  $('#saved-link').value = editURL(id, token);
+  $('#dlg-saved').showModal();
+  setTimeout(() => { try { $('#saved-link').select(); } catch {} }, 50);
+}
+
+async function submitForm(e) {
+  e.preventDefault();
+  const row = readForm(); if (!row) return;
+  const err = $('#form-err');
   $('#f-submit').disabled = true;
   try {
-    await db.addEvent(row); identity.set({ name, email });
-    $('#dlg-new').close(); toast('Takk! Forslaget er lagt inn og venter på godkjenning.', 5000);
-    if (row.city !== city && row.city !== NATIONAL) { city = row.city; $('#city').value = city; try { localStorage.setItem('dvk_city', city); } catch {} }
-    selectedDay = start_date; cursor = new Date(parseISO(start_date).getFullYear(), parseISO(start_date).getMonth(), 1);
-    await reload();
+    if (formMode === 'edit') {
+      const id = formEventId;
+      const res = await db.updateEvent(id, tokens.get(id), row);
+      $('#dlg-new').close();
+      await reload();
+      toast(res && res.reset
+        ? 'Lagret. Tittelen ble endret, så arrangementet må godkjennes på nytt.'
+        : 'Endringene er lagret.', 5000);
+      openEvent(id);
+    } else {
+      const res = await db.addEvent(row);
+      identity.set({ name: row.submitter_name, email: row.submitter_email });
+      if (res && res.id && res.edit_token) tokens.set(res.id, res.edit_token);
+      $('#dlg-new').close();
+      if (row.city !== city && row.city !== NATIONAL) { city = row.city; $('#city').value = city; try { localStorage.setItem('dvk_city', city); } catch {} }
+      selectedDay = row.start_date; cursor = new Date(parseISO(row.start_date).getFullYear(), parseISO(row.start_date).getMonth(), 1);
+      await reload();
+      if (res && res.id && res.edit_token) showSavedLink(res.id, true);
+      else toast('Takk! Forslaget er lagt inn og venter på godkjenning.', 5000);
+    }
   } catch (ex) { err.textContent = friendlyError(ex); }
   finally { $('#f-submit').disabled = false; }
+}
+
+/* Gjentakende arrangement: spør om det gjelder én dag eller hele serien */
+function startEdit(id, date) {
+  const ev = events.find(e => e.id === id); if (!ev) return;
+  if (!tokens.get(id)) return toast('Du har ikke redigeringslenken for dette arrangementet.');
+  if (ev.recurrence !== 'weekly') return openEdit(id);
+  date = date || $('#dlg-event').dataset.date || nextOccurrence(ev);
+  $('#scope-hint').textContent = `«${ev.title}» gjentas hver uke. Skal endringen gjelde bare denne ene dagen, eller alle datoene i serien?`;
+  $('#scope-one').textContent = `📅 Bare ${fmtLongLc(date)}`;
+  $('#scope-one').onclick = () => { $('#dlg-scope').close(); openOccurrence(id, date); };
+  $('#scope-all').onclick = () => { $('#dlg-scope').close(); openEdit(id); };
+  if ($('#dlg-event').open) $('#dlg-event').close();
+  $('#dlg-scope').showModal();
+}
+
+let occEventId = null, occDate = null;
+
+function openOccurrence(id, date) {
+  const ev = events.find(e => e.id === id); if (!ev) return;
+  occEventId = id; occDate = date;
+  const o = overrideFor(id, date);
+  $('#occ-title').textContent = 'Endre ' + fmtLongLc(date);
+  $('#occ-hint').textContent = `Gjelder bare ${fmtLongLc(date)}. Felt du lar stå tomme, følger serien: ${timeRange(ev)}${ev.location ? ', ' + ev.location : ''}.`;
+  $('#o-cancelled').checked = !!(o && o.cancelled);
+  $('#o-start').value = o && o.start_time ? hhmm(o.start_time) : '';
+  $('#o-end').value = o && o.end_time ? hhmm(o.end_time) : '';
+  $('#o-location').value = (o && o.location) || '';
+  $('#o-desc').value = (o && o.description) || '';
+  $('#occ-fields').hidden = $('#o-cancelled').checked;
+  $('#o-reset').hidden = !o;
+  $('#occ-err').textContent = '';
+  $('#dlg-occurrence').showModal();
+}
+
+async function submitOccurrence(e) {
+  e.preventDefault();
+  const err = $('#occ-err'); err.textContent = '';
+  const cancelled = $('#o-cancelled').checked;
+  const start_time = $('#o-start').value || null, end_time = $('#o-end').value || null;
+  if (!cancelled && start_time && end_time && end_time <= start_time) return err.textContent = 'Sluttid må være etter starttid.';
+  if (!cancelled && end_time && !start_time) return err.textContent = 'Skriv inn starttid når du oppgir sluttid.';
+  $('#o-submit').disabled = true;
+  try {
+    await db.setOccurrence(occEventId, tokens.get(occEventId), occDate, {
+      cancelled, start_time, end_time,
+      location: $('#o-location').value.trim() || null,
+      description: $('#o-desc').value.trim() || null
+    });
+    $('#dlg-occurrence').close();
+    await reload();
+    toast(cancelled ? `${cap(fmtLong(occDate))} er avlyst. Resten av serien går som normalt.` : `${cap(fmtLong(occDate))} er oppdatert.`, 5000);
+    openEvent(occEventId, occDate);
+  } catch (ex) { err.textContent = friendlyError(ex); }
+  finally { $('#o-submit').disabled = false; }
+}
+
+async function resetOccurrence() {
+  if (!confirm(`Tilbakestille ${fmtLongLc(occDate)} til det serien sier?`)) return;
+  $('#o-reset').disabled = true;
+  try {
+    await db.clearOccurrence(occEventId, tokens.get(occEventId), occDate);
+    $('#dlg-occurrence').close();
+    await reload();
+    toast('Dagen følger serien igjen.');
+    openEvent(occEventId, occDate);
+  } catch (ex) { $('#occ-err').textContent = friendlyError(ex); }
+  finally { $('#o-reset').disabled = false; }
+}
+
+async function doDelete(id) {
+  const ev = events.find(e => e.id === id); if (!ev) return;
+  const token = tokens.get(id);
+  if (!token) return toast('Du har ikke redigeringslenken for dette arrangementet.');
+  const msg = ev.recurrence === 'weekly'
+    ? `Slette HELE serien «${ev.title}»?\n\nAlle datoene forsvinner fra kalenderen for alle. Skal du bare avlyse én dag, avbryt og velg «Rediger» i stedet.\n\nDette kan ikke angres.`
+    : `Slette «${ev.title}»?\n\nArrangementet forsvinner fra kalenderen for alle. Dette kan ikke angres.`;
+  if (!confirm(msg)) return;
+  try {
+    await db.deleteEvent(id, token);
+    tokens.remove(id);
+    $('#dlg-event').close();
+    await reload();
+    toast('Arrangementet er slettet.');
+  } catch (e) { toast(friendlyError(e), 5000); }
 }
 
 /* ---------- Oppstart ---------- */
@@ -766,7 +1139,11 @@ function init() {
   $('#weekday-picks').innerHTML = [1,2,3,4,5,6,0].map(w => `<label><input type="checkbox" value="${w}"><span>${WEEKDAY_SHORT[w]}</span></label>`).join('');
   $('#legend').innerHTML = Object.values(CATEGORIES).map(c => `<span style="--c:${c.color}"><i></i>${esc(c.label)}</span>`).join('');
   $('#f-recurring').onchange = e => { $('#recur-fields').hidden = !e.target.checked; };
-  $('#form-new').onsubmit = submitNew;
+  $('#form-new').onsubmit = submitForm;
+  $('#saved-copy').onclick = () => copyText($('#saved-link').value).then(ok => toast(ok ? 'Redigeringslenken er kopiert – lim den inn et trygt sted.' : 'Kunne ikke kopiere. Marker teksten og kopier manuelt.'));
+  $('#form-occurrence').onsubmit = submitOccurrence;
+  $('#o-reset').onclick = resetOccurrence;
+  $('#o-cancelled').onchange = e => { $('#occ-fields').hidden = e.target.checked; };
   // Navigasjon
   document.querySelectorAll('.seg button').forEach(b => b.onclick = () => { view = b.dataset.view; render(); });
   $('#prev').onclick = () => { cursor.setMonth(cursor.getMonth() - 1); render(); };
@@ -790,6 +1167,14 @@ function init() {
     const dlg = $('#dlg-event'); const ev = events.find(x => x.id === dlg.dataset.id); const date = dlg.dataset.date;
     if (e.target.closest('[data-approve]')) return doApprove(e.target.closest('[data-approve]').dataset.approve);
     if (e.target.closest('[data-report]')) return doReport(e.target.closest('[data-report]').dataset.report);
+    if (e.target.closest('[data-edit]')) return startEdit(e.target.closest('[data-edit]').dataset.edit, date);
+    if (e.target.closest('[data-delete]')) return doDelete(e.target.closest('[data-delete]').dataset.delete);
+    const copyEdit = e.target.closest('[data-copy-editlink]');
+    if (copyEdit) {
+      const t = tokens.get(copyEdit.dataset.copyEditlink);
+      if (!t) return toast('Fant ikke redigeringslenken.');
+      return copyText(editURL(copyEdit.dataset.copyEditlink, t)).then(ok => toast(ok ? 'Redigeringslenken er kopiert – ta vare på den.' : 'Kunne ikke kopiere.'));
+    }
     if (e.target.closest('[data-copy-link]') && ev) return copyText(shareURL(ev, date)).then(ok => toast(ok ? 'Lenke kopiert!' : 'Kunne ikke kopiere.'));
     if (e.target.closest('[data-copy-text]') && ev) return copyText(shareText(ev, date)).then(ok => toast(ok ? 'Tekst kopiert – lim inn i Instagram, Facebook e.l.' : 'Kunne ikke kopiere.'));
     if (e.target.closest('[data-ics]') && ev) return download(`${ev.title.toLowerCase().replace(/[^a-zæøå0-9]+/g,'-')}.ics`, icsFile([ev], ev.title));
@@ -797,13 +1182,17 @@ function init() {
   // Delt lenke
   reload().then(() => {
     const p = new URLSearchParams(location.search);
-    if (p.get('event')) {
-      const ev = events.find(x => x.id === p.get('event'));
-      if (ev) {
-        if (ev.city !== NATIONAL && ev.city !== city && CITIES.includes(ev.city)) { city = ev.city; $('#city').value = city; render(); }
-        openEvent(ev.id, p.get('date') || undefined);
-      } else toast('Fant ikke arrangementet – det kan være fjernet.');
+    if (!p.get('event')) return;
+    // Redigeringslenke: husk nøkkelen, og fjern den fra adressefeltet
+    if (p.get('token')) {
+      tokens.set(p.get('event'), p.get('token'));
+      try { history.replaceState(null, '', `${location.pathname}?event=${encodeURIComponent(p.get('event'))}`); } catch {}
     }
+    const ev = events.find(x => x.id === p.get('event'));
+    if (ev) {
+      if (ev.city !== NATIONAL && ev.city !== city && CITIES.includes(ev.city)) { city = ev.city; $('#city').value = city; render(); }
+      openEvent(ev.id, p.get('date') || undefined);
+    } else toast('Fant ikke arrangementet – det kan være slettet.', 5000);
   });
 }
 init();
