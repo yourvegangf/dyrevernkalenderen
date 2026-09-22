@@ -66,7 +66,8 @@
     color: #fff; font-weight: 700; font-size: 1.15rem; text-shadow: 0 1px 4px rgba(0,0,0,.4);
     background: linear-gradient(to top, rgba(20,40,25,.65), transparent);
   }
-  @media (max-width: 699px) { .hero { aspect-ratio: 4 / 3; border-radius: 12px; } }
+  @media (max-width: 699px) { .hero { aspect-ratio: 3 / 2; border-radius: 12px; } }
+  .photo-credit { margin: 5px 4px 0; text-align: right; font-size: .72rem; color: var(--muted); }
   .toolbar { display: flex; align-items: center; gap: 10px; padding: 14px 0 6px; flex-wrap: wrap; }
   .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 999px; overflow: hidden; background: var(--surface); }
   .seg button { border: 0; background: transparent; padding: 8px 16px; font-weight: 600; color: var(--muted); }
@@ -239,9 +240,10 @@
 
 <div class="wrap">
     <figure class="hero">
-    <img src="bilde.jpg" alt="En and i en elv">
+    <img src="bilde.jpg" alt="Aktivister samlet bak et banner med teksten The National Animal Rights Day">
     <figcaption>Sammen for dyra – finn noe å bli med på!</figcaption>
   </figure>
+  <p class="photo-credit">Foto: Werner Rinde</p>
   <div class="toolbar">
     <div class="seg" role="tablist">
       <button data-view="month" class="active">Måned</button>
