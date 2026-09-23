@@ -293,6 +293,8 @@
   .weekday-picks input { display: none; }
   .weekday-picks input:checked + span { color: var(--on-accent); }
   .weekday-picks label:has(input:checked) { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+  /* Robotfelle – må finnes i koden, men aldri synes for folk */
+  .trap { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
   .err { color: var(--danger); font-size: .9rem; margin: 6px 0; }
   .hint { color: var(--muted); font-size: .85rem; }
 
@@ -401,6 +403,7 @@
   <footer>
     <p>Alle kan foreslå arrangementer. Et forslag blir synlig som «venter» med én gang, og godkjent når tre andre personer har godkjent det. Forslag som ikke får tre godkjenninger innen 14 dager, fjernes. Arrangementer i kategorien «Digitalt», og de som er merket med byen «Nasjonalt / digitalt», vises i alle bykalendere.</p>
     <p>Når du sender inn et arrangement, får du en hemmelig redigeringslenke. Med den kan du rette opplysninger eller slette arrangementet senere – også fra en annen enhet. Ta vare på den.</p>
+    <p><a href="#" id="link-feedback">✉️ Send en tilbakemelding</a> – funnet en feil, eller har du et forslag? Si fra.</p>
     <p>Vil du ha kalenderen i din egen kalender-app? Trykk «.ics» øverst for å laste ned alle godkjente arrangementer i valgt by, eller last ned ett arrangement om gangen.</p>
   </footer>
 </div>
@@ -525,6 +528,29 @@
       <div class="row"><label for="i-email">E-post <small>(vises ikke, brukes bare for å hindre dobbeltstemmer)</small></label><input id="i-email" type="email" required autocomplete="email"></div>
       <div class="err" id="id-err"></div>
       <div class="actions"><button type="submit" class="btn primary" id="id-submit">Fortsett</button><button type="button" class="btn" data-close>Avbryt</button></div>
+    </form>
+  </div>
+</dialog>
+
+<!-- Tilbakemelding -->
+<dialog id="dlg-feedback">
+  <div class="dlg-head"><h2>Send en tilbakemelding</h2><button class="close" data-close aria-label="Lukk">✕</button></div>
+  <div class="dlg-body">
+    <form id="form-feedback" novalidate>
+      <p class="hint">Funnet en feil, har du et forslag, eller lurer du på noe? Skriv gjerne.</p>
+      <div class="row two">
+        <div class="row"><label for="fb-name">Navn <small>(valgfritt)</small></label><input id="fb-name" type="text" maxlength="80" autocomplete="name"></div>
+        <div class="row"><label for="fb-email">E-post <small>(valgfritt)</small></label><input id="fb-email" type="email" autocomplete="email"></div>
+      </div>
+      <div class="row"><label for="fb-message">Melding</label><textarea id="fb-message" required maxlength="3000" style="min-height:130px"></textarea></div>
+      <!-- Robotfelle: usynlig for folk, men roboter fyller den ut -->
+      <div class="trap" aria-hidden="true">
+        <label for="fb-website">La dette feltet stå tomt</label>
+        <input id="fb-website" type="text" tabindex="-1" autocomplete="off">
+      </div>
+      <div class="err" id="fb-err"></div>
+      <p class="hint">Legg igjen e-post hvis du vil ha svar. Adressen vises ikke noe sted, og brukes bare til å svare deg.</p>
+      <div class="actions"><button type="submit" class="btn primary" id="fb-submit">Send melding</button><button type="button" class="btn" data-close>Avbryt</button></div>
     </form>
   </div>
 </dialog>
@@ -659,6 +685,11 @@ const db = {
     if (error) throw error;
     return data;
   },
+  async sendFeedback(name, email, message) {
+    if (!this.live) { console.log('Demo – ville sendt:', { name, email, message }); return; }
+    const { error } = await this.client.rpc('send_feedback', { p_name: name, p_email: email, p_message: message });
+    if (error) throw error;
+  },
   async setOccurrence(eventId, token, date, o) {
     if (!this.live) {
       this.demoOverrides = (this.demoOverrides || []).filter(x => !(x.event_id === eventId && x.occurrence_date === date));
@@ -733,6 +764,7 @@ function friendlyError(e) {
   if (!e) return 'Ukjent feil.';
   if (e.code === '23505') return 'Du har allerede gjort dette for dette arrangementet.';
   if (e.code === '23514') return 'Noe i skjemaet var ugyldig. Sjekk feltene og prøv igjen.';
+  if (e.code === 'PGRST202') return 'Denne funksjonen er ikke helt på plass ennå. Prøv igjen senere.';
   return e.message || String(e);
 }
 
@@ -1439,6 +1471,42 @@ async function resetOccurrence() {
   finally { $('#o-reset').disabled = false; }
 }
 
+let feedbackOpenedAt = 0;
+
+function openFeedback() {
+  const saved = identity.get() || {};
+  $('#fb-name').value = saved.name || '';
+  $('#fb-email').value = saved.email || '';
+  $('#fb-message').value = ''; $('#fb-website').value = ''; $('#fb-err').textContent = '';
+  feedbackOpenedAt = Date.now();
+  $('#dlg-feedback').showModal();
+}
+
+async function submitFeedback(e) {
+  e.preventDefault();
+  const err = $('#fb-err'); err.textContent = '';
+  // Roboter fyller ut det skjulte feltet, og sender som regel med en gang.
+  // Vi later som det gikk bra, så de ikke prøver igjen på en annen måte.
+  if ($('#fb-website').value.trim() || Date.now() - feedbackOpenedAt < 3000) {
+    $('#dlg-feedback').close();
+    toast('Takk! Meldingen er sendt.', 4000);
+    return;
+  }
+  const name = $('#fb-name').value.trim();
+  const email = $('#fb-email').value.trim().toLowerCase();
+  const message = $('#fb-message').value.trim();
+  if (message.length < 5) return err.textContent = 'Skriv en litt lengre melding.';
+  if (email && !validEmail(email)) return err.textContent = 'E-postadressen ser ikke riktig ut. La feltet stå tomt hvis du ikke vil ha svar.';
+  $('#fb-submit').disabled = true;
+  try {
+    await db.sendFeedback(name || null, email || null, message);
+    if (name && email) identity.set({ name, email });
+    $('#dlg-feedback').close();
+    toast('Takk! Meldingen er sendt.', 4000);
+  } catch (ex) { err.textContent = friendlyError(ex); }
+  finally { $('#fb-submit').disabled = false; }
+}
+
 async function doDelete(id) {
   const ev = events.find(e => e.id === id); if (!ev) return;
   const token = tokens.get(id);
@@ -1483,6 +1551,8 @@ function init() {
   $('#form-new').onsubmit = submitForm;
   $('#saved-copy').onclick = () => copyText($('#saved-link').value).then(ok => toast(ok ? 'Redigeringslenken er kopiert – lim den inn et trygt sted.' : 'Kunne ikke kopiere. Marker teksten og kopier manuelt.'));
   $('#form-occurrence').onsubmit = submitOccurrence;
+  $('#form-feedback').onsubmit = submitFeedback;
+  $('#link-feedback').onclick = e => { e.preventDefault(); openFeedback(); };
   $('#o-reset').onclick = resetOccurrence;
   $('#o-cancelled').onchange = e => { $('#occ-fields').hidden = e.target.checked; };
   // Navigasjon
