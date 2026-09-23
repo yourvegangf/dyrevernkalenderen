@@ -319,7 +319,7 @@
 
   <footer>
     <div class="legend" id="legend"></div>
-    <p>Alle kan foreslå arrangementer. Et forslag blir synlig som «venter» med én gang, og godkjent når tre andre personer har godkjent det. Forslag som ikke får tre godkjenninger innen 14 dager, fjernes. Arrangementer merket «Nasjonalt / digitalt» vises i alle byer.</p>
+    <p>Alle kan foreslå arrangementer. Et forslag blir synlig som «venter» med én gang, og godkjent når tre andre personer har godkjent det. Forslag som ikke får tre godkjenninger innen 14 dager, fjernes. Arrangementer i kategorien «Digitalt», og de som er merket med byen «Nasjonalt / digitalt», vises i alle bykalendere.</p>
     <p>Når du sender inn et arrangement, får du en hemmelig redigeringslenke. Med den kan du rette opplysninger eller slette arrangementet senere – også fra en annen enhet. Ta vare på den.</p>
     <p>Vil du ha kalenderen i din egen kalender-app? Trykk «.ics» øverst for å laste ned alle godkjente arrangementer i valgt by, eller last ned ett arrangement om gangen.</p>
   </footer>
@@ -347,6 +347,7 @@
         <div class="row"><label for="f-category">Kategori</label><select id="f-category" required></select></div>
         <div class="row"><label for="f-city">By</label><select id="f-city" required></select></div>
       </div>
+      <p class="hint" id="f-digital-hint" hidden>💻 Digitale arrangementer vises i alle bykalendere, uansett hvilken by du velger.</p>
       <div class="row"><label for="f-location">Sted <small>(adresse eller møtepunkt)</small></label><input id="f-location" type="text" maxlength="200" placeholder="F.eks. Eidsvolls plass, foran Stortinget"></div>
       <div class="row two">
         <div class="row"><label for="f-date">Dato</label><input id="f-date" type="date" required></div>
@@ -665,7 +666,10 @@ let selectedDay = todayISO;
 let listMonths = 6;
 
 /* ---------- Forekomster (håndterer gjentakelse) ---------- */
-function inCity(ev) { return ev.city === city || ev.city === NATIONAL; }
+/* Digitale arrangementer har ingen fysisk plass, og vises derfor i alle byer –
+   både de som er merket «Nasjonalt / digitalt» og de med kategorien Digitalt. */
+const isOnline = ev => ev.city === NATIONAL || ev.category === 'digitalt';
+function inCity(ev) { return ev.city === city || isOnline(ev); }
 /* Flerdagers arrangementer: sluttdato etter startdato */
 const isMultiDay = ev => !!ev.end_date && ev.end_date > ev.start_date;
 const dayCount = ev => Math.round((parseISO(ev.end_date) - parseISO(ev.start_date)) / 864e5) + 1;
@@ -744,7 +748,7 @@ function cardHTML(inst) {
     <div class="body">
       <div class="meta"><span>${esc(timeRangeOn(ev, inst.date))}</span><span>·</span><span>${esc(cat.label)}</span>${isMultiDay(ev) ? `<span class="badge span">Dag ${dayNumber(ev, inst.date)} av ${dayCount(ev)}</span>` : ''}${ev.cancelled ? `<span class="badge off">Avlyst</span>` : ''}${pending ? `<span class="badge">Venter ${ev.approval_count}/3</span>` : ''}</div>
       <h4>${esc(ev.title)}</h4>
-      <div class="meta">${esc([sub, ev.city !== city ? ev.city : ''].filter(Boolean).join(' · '))}${ev.recurrence ? ' <span>↻ ukentlig</span>' : ''}</div>
+      <div class="meta">${esc([sub, (ev.category === 'digitalt' || ev.city === city) ? '' : ev.city].filter(Boolean).join(' · '))}${ev.recurrence ? ' <span>↻ ukentlig</span>' : ''}</div>
     </div>
   </article>`;
 }
@@ -830,7 +834,9 @@ function openEvent(id, date) {
            <br><span class="hint">Varer i ${dayCount(ev)} dager – du ser dag ${dayNumber(ev, date)}</span>`
         : `<strong>${esc(fmtLongYear(date))}</strong>${ev.start_time ? ' kl. ' + esc(timeRange(ev)) : ''}${recurText ? `<br><span class="hint">↻ ${esc(recurText)}</span>` : ''}`
       }</span>
-      <span class="ic">📍</span><span>${esc([ev.location, ev.city].filter(Boolean).join(', ') || 'Sted ikke oppgitt')}</span>
+      <span class="ic">${ev.category === 'digitalt' ? '💻' : '📍'}</span><span>${ev.category === 'digitalt'
+        ? esc(['Digitalt arrangement', ev.location].filter(Boolean).join(' · '))
+        : esc([ev.location, ev.city].filter(Boolean).join(', ') || 'Sted ikke oppgitt')}</span>
       ${ev.organizer ? `<span class="ic">👥</span><span>${esc(ev.organizer)}</span>` : ''}
       ${ev.url ? `<span class="ic">🔗</span><span><a href="${esc(ev.url)}" target="_blank" rel="noopener">${esc(ev.url.replace(/^https?:\/\//,'').slice(0,60))}</a></span>` : ''}
       <span class="ic">✍️</span><span class="hint">Foreslått av ${esc(ev.submitter_name)}${ev.edited_at ? ` · endret ${esc(fmtLongYearLc(ev.edited_at.slice(0,10)))}` : ''}</span>
@@ -1098,6 +1104,8 @@ function doReport(id) {
 }
 let formMode = 'new', formEventId = null;
 
+function updateDigitalHint() { $('#f-digital-hint').hidden = $('#f-category').value !== 'digitalt'; }
+
 function openNew(date) {
   formMode = 'new'; formEventId = null;
   const saved = identity.get() || {};
@@ -1112,6 +1120,7 @@ function openNew(date) {
   $('#f-recurring').checked = false; $('#recur-fields').hidden = true; $('#f-until').value = '';
   document.querySelectorAll('#weekday-picks input').forEach(i => i.checked = false);
   $('#f-city').value = city; $('#f-category').value = 'annet'; $('#form-err').textContent = '';
+  updateDigitalHint();
   $('#dlg-new').showModal();
 }
 
@@ -1143,6 +1152,7 @@ function openEdit(id) {
   $('#f-until').value = ev.recur_until || '';
   document.querySelectorAll('#weekday-picks input').forEach(i => i.checked = recurring && (ev.weekdays || []).includes(Number(i.value)));
   $('#form-err').textContent = '';
+  updateDigitalHint();
   if ($('#dlg-event').open) $('#dlg-event').close();
   $('#dlg-new').showModal();
 }
@@ -1325,6 +1335,7 @@ function init() {
   $('#f-city').innerHTML = [...CITIES, NATIONAL].map(c => `<option>${esc(c)}</option>`).join('');
   $('#weekday-picks').innerHTML = [1,2,3,4,5,6,0].map(w => `<label><input type="checkbox" value="${w}"><span>${WEEKDAY_SHORT[w]}</span></label>`).join('');
   $('#legend').innerHTML = Object.values(CATEGORIES).map(c => `<span style="--c:${c.color}"><i></i>${esc(c.label)}</span>`).join('');
+  $('#f-category').onchange = updateDigitalHint;
   // Gjentakelse og flerdagers utelukker hverandre
   $('#f-recurring').onchange = e => {
     $('#recur-fields').hidden = !e.target.checked;
