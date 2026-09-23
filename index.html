@@ -3,8 +3,51 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Dyrevernkalenderen</title>
-<meta name="description" content="Felles kalender for dyrevernarrangementer i Norge – demonstrasjoner, stands, foredrag, film og frivillig innsats.">
+<title>Dyrevernkalenderen – dyrevernarrangementer i Oslo og Norge</title>
+<meta name="description" content="Felles oversikt over dyrevernarrangementer i Norge: demonstrasjoner, stands, foredrag, filmvisninger og frivillig innsats i Oslo, Bergen, Trondheim og resten av landet. Alle kan legge inn arrangementer.">
+<link rel="canonical" href="https://dyrevernkalenderen.no/">
+<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
+<meta name="theme-color" content="#3a8a5c">
+
+<!-- Forhåndsvisning når lenken deles på Facebook, Instagram, Messenger osv. -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Dyrevernkalenderen">
+<meta property="og:locale" content="nb_NO">
+<meta property="og:url" content="https://dyrevernkalenderen.no/">
+<meta property="og:title" content="Dyrevernkalenderen – dyrevernarrangementer i Oslo og Norge">
+<meta property="og:description" content="Demonstrasjoner, stands, foredrag, filmvisninger og frivillig innsats for dyra. Alle kan legge inn arrangementer.">
+<meta property="og:image" content="https://dyrevernkalenderen.no/bilde.jpg">
+<meta property="og:image:width" content="1600">
+<meta property="og:image:height" content="1067">
+<meta property="og:image:alt" content="Aktivister samlet bak et banner med teksten The National Animal Rights Day">
+<meta name="twitter:card" content="summary_large_image">
+
+<!-- Forteller Google hva slags nettsted dette er -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebSite",
+      "@id": "https://dyrevernkalenderen.no/#nettsted",
+      "url": "https://dyrevernkalenderen.no/",
+      "name": "Dyrevernkalenderen",
+      "description": "Felles oversikt over dyrevernarrangementer i Norge.",
+      "inLanguage": "nb-NO"
+    },
+    {
+      "@type": "WebPage",
+      "@id": "https://dyrevernkalenderen.no/#side",
+      "url": "https://dyrevernkalenderen.no/",
+      "name": "Dyrevernkalenderen – dyrevernarrangementer i Oslo og Norge",
+      "isPartOf": { "@id": "https://dyrevernkalenderen.no/#nettsted" },
+      "inLanguage": "nb-NO",
+      "primaryImageOfPage": "https://dyrevernkalenderen.no/bilde.jpg"
+    }
+  ]
+}
+</script>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   :root {
@@ -667,14 +710,18 @@ function nextOccurrence(ev) {
 }
 
 /* ---------- Rendering ---------- */
+/* Kortene viser arrangør, ikke sted – hvem som står bak sier mer når man
+   skanner lista. Stedet står i detaljvisningen. Mangler arrangør, faller vi
+   tilbake til stedet, så linjen aldri blir tom. */
 function cardHTML(inst) {
   const ev = inst.ev, cat = catOf(ev), pending = !ev.approved;
+  const sub = ev.organizer || ev.location;
   return `<article class="card ${pending ? 'pending' : ''} ${ev.cancelled ? 'off' : ''}" data-id="${esc(ev.id)}" data-date="${inst.date}" style="--c:${cat.color}">
     <div class="bar"></div>
     <div class="body">
       <div class="meta"><span>${esc(timeRange(ev))}</span><span>·</span><span>${esc(cat.label)}</span>${ev.cancelled ? `<span class="badge off">Avlyst</span>` : ''}${pending ? `<span class="badge">Venter ${ev.approval_count}/3</span>` : ''}</div>
       <h4>${esc(ev.title)}</h4>
-      <div class="meta">${esc([ev.location, ev.city !== city ? ev.city : ''].filter(Boolean).join(' · '))}${ev.recurrence ? ' <span>↻ ukentlig</span>' : ''}</div>
+      <div class="meta">${esc([sub, ev.city !== city ? ev.city : ''].filter(Boolean).join(' · '))}${ev.recurrence ? ' <span>↻ ukentlig</span>' : ''}</div>
     </div>
   </article>`;
 }
@@ -860,6 +907,97 @@ function icsFile(list, name) {
   return lines.map(fold).join('\r\n') + '\r\n';
 }
 
+/* ---------- Strukturerte data for Google ----------
+   Legger godkjente arrangementer inn i et format søkemotorer forstår,
+   slik at de kan vises som arrangementer i søkeresultatene.        */
+const SITE = 'https://dyrevernkalenderen.no';
+const SEO_DAYS = 120;   // hvor langt fram vi melder inn
+const SEO_MAX  = 60;    // maks antall, så siden ikke blir unødig tung
+
+/* Norsk tidssone: +02:00 om sommeren, +01:00 om vinteren */
+function osloOffset(dateISO) {
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'Europe/Oslo', timeZoneName: 'longOffset' })
+      .formatToParts(new Date(dateISO + 'T12:00:00Z'));
+    const tz = parts.find(p => p.type === 'timeZoneName');
+    const m = tz && tz.value.match(/GMT([+-]\d{2}:\d{2})/);
+    if (m) return m[1];
+  } catch {}
+  // Reserve: sommertid varer fra siste søndag i mars til siste søndag i oktober
+  const d = parseISO(dateISO), y = d.getFullYear();
+  const lastSunday = mo => { const x = new Date(y, mo + 1, 0); x.setDate(x.getDate() - x.getDay()); return x; };
+  return (d >= lastSunday(2) && d < lastSunday(9)) ? '+02:00' : '+01:00';
+}
+const stamp = (dateISO, t) => t ? `${dateISO}T${hhmm(t)}:00${osloOffset(dateISO)}` : dateISO;
+/* Kort ned tekst uten å kutte midt i et ord */
+function trim(s, max) {
+  const t = String(s).replace(/\s+/g, ' ').trim();
+  if (t.length <= max) return t;
+  const cut = t.slice(0, max);
+  const sp = cut.lastIndexOf(' ');
+  return (sp > max * 0.6 ? cut.slice(0, sp) : cut).replace(/[,.;:–-]$/, '') + '…';
+}
+
+function eventLD(ev, date) {
+  const online = ev.city === NATIONAL || ev.category === 'digitalt';
+  const ld = {
+    '@type': 'Event',
+    'name': ev.title,
+    'startDate': stamp(date, ev.start_time),
+    'eventStatus': ev.cancelled ? 'https://schema.org/EventCancelled' : 'https://schema.org/EventScheduled',
+    'eventAttendanceMode': online
+      ? 'https://schema.org/OnlineEventAttendanceMode'
+      : 'https://schema.org/OfflineEventAttendanceMode',
+    'url': `${SITE}/?event=${encodeURIComponent(ev.id)}&date=${date}`,
+    'isAccessibleForFree': true,
+    'inLanguage': 'nb-NO',
+    'image': [`${SITE}/bilde.jpg`]
+  };
+  if (ev.end_time) ld.endDate = stamp(date, ev.end_time);
+  if (ev.url) ld.sameAs = ev.url;            // f.eks. Facebook-arrangementet
+  ld.description = ev.description
+    ? trim(ev.description, 480)
+    : `${catOf(ev).label} i regi av dyrevernbevegelsen${ev.city !== NATIONAL ? ' i ' + ev.city : ''}.`;
+  ld.location = online
+    ? { '@type': 'VirtualLocation', 'url': ev.url || SITE + '/' }
+    : {
+        '@type': 'Place',
+        'name': ev.location || ev.city,
+        'address': { '@type': 'PostalAddress', 'addressLocality': ev.city, 'addressCountry': 'NO',
+                     ...(ev.location ? { 'streetAddress': ev.location } : {}) }
+      };
+  if (ev.organizer) ld.organizer = { '@type': 'Organization', 'name': ev.organizer };
+  return ld;
+}
+
+function updateStructuredData() {
+  const to = iso(addDays(new Date(), SEO_DAYS));
+  const seen = new Set();
+  const list = [];
+  for (const ev of events) {
+    if (!ev.approved || isStale(ev)) continue;          // bare bekreftede arrangementer
+    for (const inst of instances(ev, todayISO, to)) {
+      const eff = effective(ev, inst.date);
+      const key = ev.id + '|' + inst.date;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      list.push({ eff, date: inst.date });
+    }
+  }
+  list.sort((a, b) => a.date.localeCompare(b.date));
+  const items = list.slice(0, SEO_MAX).map(x => eventLD(x.eff, x.date));
+
+  let tag = document.getElementById('ld-events');
+  if (!items.length) { if (tag) tag.remove(); return; }
+  if (!tag) {
+    tag = document.createElement('script');
+    tag.type = 'application/ld+json';
+    tag.id = 'ld-events';
+    document.head.appendChild(tag);
+  }
+  tag.textContent = JSON.stringify(items.length === 1 ? items[0] : items);
+}
+
 /* ---------- Identitet (navn + e-post) ---------- */
 function askIdentity(title, hint) {
   return new Promise(resolve => {
@@ -893,6 +1031,7 @@ async function reload() {
     for (const o of await db.loadOverrides()) overrideMap[o.event_id + '|' + o.occurrence_date] = o;
   } catch (e) { overrideMap = {}; console.warn('Kunne ikke hente endringer på enkeltdager:', e); }
   render();
+  try { updateStructuredData(); } catch (e) { console.warn('Kunne ikke bygge strukturerte data:', e); }
 }
 async function doApprove(id) {
   const who = await askIdentity('Godkjenn arrangement', 'Navnet ditt vises ikke. E-posten brukes bare for å sikre én godkjenning per person.');
