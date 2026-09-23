@@ -241,6 +241,7 @@
 
   /* Avlyst enkeltdag */
   .badge.off { background: color-mix(in srgb, var(--danger) 14%, transparent); color: var(--danger); }
+  .badge.span { background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent-hover); }
   .card.off .body h4 { text-decoration: line-through; }
   .card.off { opacity: .72; }
   .card.off .bar { background: repeating-linear-gradient(45deg, var(--danger) 0 4px, transparent 4px 8px); }
@@ -349,12 +350,13 @@
       <div class="row"><label for="f-location">Sted <small>(adresse eller møtepunkt)</small></label><input id="f-location" type="text" maxlength="200" placeholder="F.eks. Eidsvolls plass, foran Stortinget"></div>
       <div class="row two">
         <div class="row"><label for="f-date">Dato</label><input id="f-date" type="date" required></div>
-        <div class="row"><label for="f-start">Starter <small>(valgfritt)</small></label><input id="f-start" type="time"></div>
+        <div class="row" id="f-enddate-row"><label for="f-enddate">Til dato <small>(kun flerdagers)</small></label><input id="f-enddate" type="date"></div>
       </div>
       <div class="row two">
+        <div class="row"><label for="f-start">Starter <small>(valgfritt)</small></label><input id="f-start" type="time"></div>
         <div class="row"><label for="f-end">Slutter <small>(valgfritt)</small></label><input id="f-end" type="time"></div>
-        <div class="row"><label for="f-organizer">Arrangør</label><input id="f-organizer" type="text" maxlength="120"></div>
       </div>
+      <div class="row"><label for="f-organizer">Arrangør</label><input id="f-organizer" type="text" maxlength="120"></div>
       <div class="row">
         <label class="check"><input id="f-recurring" type="checkbox"> Gjentas ukentlig</label>
       </div>
@@ -498,7 +500,7 @@ const WEEKDAY_SHORT = ['sø','ma','ti','on','to','fr','lø'];
 const WEEKDAY_LONG  = ['søndag','mandag','tirsdag','onsdag','torsdag','fredag','lørdag'];
 const BYDAY = ['SU','MO','TU','WE','TH','FR','SA'];
 const PENDING_DAYS = 14;
-const EVENT_COLUMNS = 'id,created_at,edited_at,title,description,category,city,location,organizer,url,start_date,start_time,end_time,recurrence,weekdays,recur_until,submitter_name,approved,approval_count';
+const EVENT_COLUMNS = 'id,created_at,edited_at,title,description,category,city,location,organizer,url,start_date,end_date,start_time,end_time,recurrence,weekdays,recur_until,submitter_name,approved,approval_count';
 
 /* ---------- Hjelpere ---------- */
 const $ = s => document.querySelector(s);
@@ -511,7 +513,8 @@ const hhmm = t => t ? t.slice(0,5) : '';
 const todayISO = iso(new Date());
 const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
 const fmtLong = s => cap(new Intl.DateTimeFormat('nb-NO', { weekday:'long', day:'numeric', month:'long' }).format(parseISO(s)));
-const fmtLongLc = s => fmtLong(s).toLowerCase();   // midt i en setning
+const fmtLongLc = s => fmtLong(s).toLowerCase();           // midt i en setning
+const fmtLongYearLc = s => fmtLongYear(s).toLowerCase();   // midt i en setning
 const fmtLongYear = s => cap(new Intl.DateTimeFormat('nb-NO', { weekday:'long', day:'numeric', month:'long', year:'numeric' }).format(parseISO(s)));
 const timeRange = ev => ev.start_time ? (hhmm(ev.start_time) + (ev.end_time ? '–' + hhmm(ev.end_time) : '')) : 'Hele dagen';
 const catOf = ev => CATEGORIES[ev.category] || CATEGORIES.annet;
@@ -600,7 +603,8 @@ const db = {
     return {
       p_title: row.title, p_description: row.description, p_category: row.category, p_city: row.city,
       p_location: row.location, p_organizer: row.organizer, p_url: row.url,
-      p_start_date: row.start_date, p_start_time: row.start_time, p_end_time: row.end_time,
+      p_start_date: row.start_date, p_end_date: row.end_date,
+      p_start_time: row.start_time, p_end_time: row.end_time,
       p_recurrence: row.recurrence, p_weekdays: row.weekdays, p_recur_until: row.recur_until
     };
   },
@@ -662,10 +666,28 @@ let listMonths = 6;
 
 /* ---------- Forekomster (håndterer gjentakelse) ---------- */
 function inCity(ev) { return ev.city === city || ev.city === NATIONAL; }
+/* Flerdagers arrangementer: sluttdato etter startdato */
+const isMultiDay = ev => !!ev.end_date && ev.end_date > ev.start_date;
+const dayCount = ev => Math.round((parseISO(ev.end_date) - parseISO(ev.start_date)) / 864e5) + 1;
+const dayNumber = (ev, date) => Math.round((parseISO(date) - parseISO(ev.start_date)) / 864e5) + 1;
+const lastDate = ev => ev.end_date && ev.end_date > ev.start_date ? ev.end_date : ev.start_date;
+/* Klokkeslett slik det gjelder på én bestemt dag av et flerdagers arrangement */
+function timeRangeOn(ev, date) {
+  if (!isMultiDay(ev)) return timeRange(ev);
+  if (date === ev.start_date) return ev.start_time ? 'Fra ' + hhmm(ev.start_time) : 'Hele dagen';
+  if (date === ev.end_date)   return ev.end_time   ? 'Til ' + hhmm(ev.end_time)   : 'Hele dagen';
+  return 'Hele dagen';
+}
+
 function instances(ev, from, to) {
   const out = [];
   if (ev.recurrence !== 'weekly') {
-    if (ev.start_date >= from && ev.start_date <= to) out.push({ ev, date: ev.start_date });
+    // Ett arrangement kan strekke seg over flere dager – vis det på hver av dem
+    const start = ev.start_date, end = lastDate(ev);
+    if (end < from || start > to) return out;
+    let d = parseISO(start > from ? start : from);
+    const stop = parseISO(end < to ? end : to);
+    for (; d <= stop; d = addDays(d, 1)) out.push({ ev, date: iso(d) });
     return out;
   }
   const days = ev.weekdays || [];
@@ -720,7 +742,7 @@ function cardHTML(inst) {
   return `<article class="card ${pending ? 'pending' : ''} ${ev.cancelled ? 'off' : ''}" data-id="${esc(ev.id)}" data-date="${inst.date}" style="--c:${cat.color}">
     <div class="bar"></div>
     <div class="body">
-      <div class="meta"><span>${esc(timeRange(ev))}</span><span>·</span><span>${esc(cat.label)}</span>${ev.cancelled ? `<span class="badge off">Avlyst</span>` : ''}${pending ? `<span class="badge">Venter ${ev.approval_count}/3</span>` : ''}</div>
+      <div class="meta"><span>${esc(timeRangeOn(ev, inst.date))}</span><span>·</span><span>${esc(cat.label)}</span>${isMultiDay(ev) ? `<span class="badge span">Dag ${dayNumber(ev, inst.date)} av ${dayCount(ev)}</span>` : ''}${ev.cancelled ? `<span class="badge off">Avlyst</span>` : ''}${pending ? `<span class="badge">Venter ${ev.approval_count}/3</span>` : ''}</div>
       <h4>${esc(ev.title)}</h4>
       <div class="meta">${esc([sub, ev.city !== city ? ev.city : ''].filter(Boolean).join(' · '))}${ev.recurrence ? ' <span>↻ ukentlig</span>' : ''}</div>
     </div>
@@ -802,11 +824,16 @@ function openEvent(id, date) {
     <div><span class="badge cat" style="--c:${cat.color}">${esc(cat.label)}</span> ${ev.cancelled ? `<span class="badge off">Avlyst denne dagen</span>` : ''} ${!ev.cancelled && ev.overridden ? `<span class="changed">Endret denne dagen</span>` : ''} ${pending ? `<span class="badge">Venter på godkjenning</span>` : ''} ${myToken ? `<span class="mine">Ditt arrangement</span>` : ''}</div>
     ${ev.cancelled ? `<div class="off-box"><strong>⚠️ Avlyst ${esc(fmtLongLc(date))}</strong><p class="hint" style="margin:6px 0 0">Resten av serien går som normalt.</p></div>` : ''}
     <div class="kv">
-      <span class="ic">📅</span><span><strong>${esc(fmtLongYear(date))}</strong>${ev.start_time ? ' kl. ' + esc(timeRange(ev)) : ''}${recurText ? `<br><span class="hint">↻ ${esc(recurText)}</span>` : ''}</span>
+      <span class="ic">📅</span><span>${isMultiDay(ev)
+        ? `<strong>${esc(fmtLongYear(ev.start_date))}</strong>${ev.start_time ? ' kl. ' + esc(hhmm(ev.start_time)) : ''}<br>
+           <span class="hint">til</span> <strong>${esc(fmtLongYearLc(ev.end_date))}</strong>${ev.end_time ? ' kl. ' + esc(hhmm(ev.end_time)) : ''}
+           <br><span class="hint">Varer i ${dayCount(ev)} dager – du ser dag ${dayNumber(ev, date)}</span>`
+        : `<strong>${esc(fmtLongYear(date))}</strong>${ev.start_time ? ' kl. ' + esc(timeRange(ev)) : ''}${recurText ? `<br><span class="hint">↻ ${esc(recurText)}</span>` : ''}`
+      }</span>
       <span class="ic">📍</span><span>${esc([ev.location, ev.city].filter(Boolean).join(', ') || 'Sted ikke oppgitt')}</span>
       ${ev.organizer ? `<span class="ic">👥</span><span>${esc(ev.organizer)}</span>` : ''}
       ${ev.url ? `<span class="ic">🔗</span><span><a href="${esc(ev.url)}" target="_blank" rel="noopener">${esc(ev.url.replace(/^https?:\/\//,'').slice(0,60))}</a></span>` : ''}
-      <span class="ic">✍️</span><span class="hint">Foreslått av ${esc(ev.submitter_name)}${ev.edited_at ? ` · endret ${esc(fmtLongYear(ev.edited_at.slice(0,10)))}` : ''}</span>
+      <span class="ic">✍️</span><span class="hint">Foreslått av ${esc(ev.submitter_name)}${ev.edited_at ? ` · endret ${esc(fmtLongYearLc(ev.edited_at.slice(0,10)))}` : ''}</span>
     </div>
     ${ev.description ? `<div class="desc">${esc(ev.description)}</div>` : ''}
     ${pending ? `<div class="approve-box">
@@ -853,14 +880,15 @@ function veventBody(ev, dateISO, opts = {}) {
   const d = icsDate(dateISO);
   const l = ['BEGIN:VEVENT', `UID:${ev.id}@dyrevernkalenderen`, `DTSTAMP:${stamp}`];
   if (opts.recurrenceId) l.push(opts.recurrenceId);
+  const endDateISO = opts.endDate || dateISO;   // flerdagers slutter en annen dag
   if (ev.start_time) {
     let end = ev.end_time;
     if (!end) { const [h, mi] = ev.start_time.split(':').map(Number); end = `${pad((h + 2) % 24)}:${pad(mi)}`; }
     l.push(`DTSTART;TZID=Europe/Oslo:${d}T${icsTime(ev.start_time)}`);
-    l.push(`DTEND;TZID=Europe/Oslo:${d}T${icsTime(end)}`);
+    l.push(`DTEND;TZID=Europe/Oslo:${icsDate(endDateISO)}T${icsTime(end)}`);
   } else {
     l.push(`DTSTART;VALUE=DATE:${d}`);
-    l.push(`DTEND;VALUE=DATE:${icsDate(iso(addDays(parseISO(dateISO), 1)))}`);
+    l.push(`DTEND;VALUE=DATE:${icsDate(iso(addDays(parseISO(endDateISO), 1)))}`);
   }
   if (opts.rrule) l.push(opts.rrule);
   if (opts.exdate) l.push(opts.exdate);
@@ -876,7 +904,9 @@ function veventBody(ev, dateISO, opts = {}) {
 }
 /* Hele arrangementet: serien, minus avlyste dager, pluss de dagene som er endret */
 function vevent(base) {
-  if (base.recurrence !== 'weekly') return veventBody(base, base.start_date);
+  if (base.recurrence !== 'weekly') {
+    return veventBody(base, base.start_date, isMultiDay(base) ? { endDate: base.end_date } : {});
+  }
 
   const ovs = Object.values(overrideMap).filter(o => o.event_id === base.id);
   const cancelled = ovs.filter(o => o.cancelled).map(o => o.occurrence_date);
@@ -939,7 +969,7 @@ function trim(s, max) {
   return (sp > max * 0.6 ? cut.slice(0, sp) : cut).replace(/[,.;:–-]$/, '') + '…';
 }
 
-function eventLD(ev, date) {
+function eventLD(ev, date, endDateISO) {
   const online = ev.city === NATIONAL || ev.category === 'digitalt';
   const ld = {
     '@type': 'Event',
@@ -954,7 +984,8 @@ function eventLD(ev, date) {
     'inLanguage': 'nb-NO',
     'image': [`${SITE}/bilde.jpg`]
   };
-  if (ev.end_time) ld.endDate = stamp(date, ev.end_time);
+  if (endDateISO) ld.endDate = stamp(endDateISO, ev.end_time);       // flerdagers
+  else if (ev.end_time) ld.endDate = stamp(date, ev.end_time);
   if (ev.url) ld.sameAs = ev.url;            // f.eks. Facebook-arrangementet
   ld.description = ev.description
     ? trim(ev.description, 480)
@@ -977,16 +1008,21 @@ function updateStructuredData() {
   const list = [];
   for (const ev of events) {
     if (!ev.approved || isStale(ev)) continue;          // bare bekreftede arrangementer
+    if (ev.recurrence !== 'weekly') {
+      // Ett arrangement – også når det varer flere dager
+      if (lastDate(ev) < todayISO || ev.start_date > to) continue;
+      list.push({ eff: ev, date: ev.start_date, endDate: isMultiDay(ev) ? ev.end_date : null });
+      continue;
+    }
     for (const inst of instances(ev, todayISO, to)) {
-      const eff = effective(ev, inst.date);
       const key = ev.id + '|' + inst.date;
       if (seen.has(key)) continue;
       seen.add(key);
-      list.push({ eff, date: inst.date });
+      list.push({ eff: effective(ev, inst.date), date: inst.date, endDate: null });
     }
   }
   list.sort((a, b) => a.date.localeCompare(b.date));
-  const items = list.slice(0, SEO_MAX).map(x => eventLD(x.eff, x.date));
+  const items = list.slice(0, SEO_MAX).map(x => eventLD(x.eff, x.date, x.endDate));
 
   let tag = document.getElementById('ld-events');
   if (!items.length) { if (tag) tag.remove(); return; }
@@ -1072,6 +1108,7 @@ function openNew(date) {
   $('#f-name').value = saved.name || ''; $('#f-email').value = saved.email || '';
   $('#f-title').value = ''; $('#f-location').value = ''; $('#f-organizer').value = ''; $('#f-url').value = ''; $('#f-desc').value = '';
   $('#f-date').value = date || (selectedDay >= todayISO ? selectedDay : todayISO); $('#f-start').value = ''; $('#f-end').value = '';
+  $('#f-enddate').value = ''; $('#f-enddate-row').hidden = false;
   $('#f-recurring').checked = false; $('#recur-fields').hidden = true; $('#f-until').value = '';
   document.querySelectorAll('#weekday-picks input').forEach(i => i.checked = false);
   $('#f-city').value = city; $('#f-category').value = 'annet'; $('#form-err').textContent = '';
@@ -1096,11 +1133,13 @@ function openEdit(id) {
   $('#f-url').value = ev.url || '';
   $('#f-desc').value = ev.description || '';
   $('#f-date').value = ev.start_date || '';
+  $('#f-enddate').value = ev.end_date || '';
   $('#f-start').value = hhmm(ev.start_time);
   $('#f-end').value = hhmm(ev.end_time);
   const recurring = ev.recurrence === 'weekly';
   $('#f-recurring').checked = recurring;
   $('#recur-fields').hidden = !recurring;
+  $('#f-enddate-row').hidden = recurring;
   $('#f-until').value = ev.recur_until || '';
   document.querySelectorAll('#weekday-picks input').forEach(i => i.checked = recurring && (ev.weekdays || []).includes(Number(i.value)));
   $('#form-err').textContent = '';
@@ -1115,6 +1154,8 @@ function readForm() {
   const title = $('#f-title').value.trim(), start_date = $('#f-date').value;
   const start_time = $('#f-start').value || null, end_time = $('#f-end').value || null;
   const recurring = $('#f-recurring').checked;
+  const end_date = (!recurring && $('#f-enddate').value && $('#f-enddate').value > start_date) ? $('#f-enddate').value : null;
+  const multi = !!end_date;
   const weekdays = [...document.querySelectorAll('#weekday-picks input:checked')].map(i => Number(i.value));
   const url = $('#f-url').value.trim();
   const name = $('#f-name').value.trim(), email = $('#f-email').value.trim().toLowerCase();
@@ -1124,7 +1165,8 @@ function readForm() {
   }
   if (title.length < 3) return fail('Tittelen må ha minst 3 tegn.');
   if (!start_date) return fail('Velg en dato.');
-  if (start_time && end_time && end_time <= start_time) return fail('Sluttid må være etter starttid.');
+  if ($('#f-enddate').value && !recurring && $('#f-enddate').value < start_date) return fail('«Til dato» kan ikke være før startdatoen.');
+  if (!multi && start_time && end_time && end_time <= start_time) return fail('Sluttid må være etter starttid.');
   if (recurring && !weekdays.length) return fail('Velg minst én ukedag.');
   if (recurring && $('#f-until').value && $('#f-until').value < start_date) return fail('Siste dato må være etter startdato.');
   if (url && !/^https?:\/\/.+/.test(url)) return fail('Lenken må starte med http:// eller https://');
@@ -1132,7 +1174,7 @@ function readForm() {
     title, category: $('#f-category').value, city: $('#f-city').value,
     location: $('#f-location').value.trim() || null, organizer: $('#f-organizer').value.trim() || null,
     url: url || null, description: $('#f-desc').value.trim() || null,
-    start_date, start_time, end_time,
+    start_date, end_date, start_time, end_time,
     recurrence: recurring ? 'weekly' : null, weekdays: recurring ? weekdays : null,
     recur_until: recurring && $('#f-until').value ? $('#f-until').value : null,
     submitter_name: name, submitter_email: email
@@ -1283,7 +1325,12 @@ function init() {
   $('#f-city').innerHTML = [...CITIES, NATIONAL].map(c => `<option>${esc(c)}</option>`).join('');
   $('#weekday-picks').innerHTML = [1,2,3,4,5,6,0].map(w => `<label><input type="checkbox" value="${w}"><span>${WEEKDAY_SHORT[w]}</span></label>`).join('');
   $('#legend').innerHTML = Object.values(CATEGORIES).map(c => `<span style="--c:${c.color}"><i></i>${esc(c.label)}</span>`).join('');
-  $('#f-recurring').onchange = e => { $('#recur-fields').hidden = !e.target.checked; };
+  // Gjentakelse og flerdagers utelukker hverandre
+  $('#f-recurring').onchange = e => {
+    $('#recur-fields').hidden = !e.target.checked;
+    $('#f-enddate-row').hidden = e.target.checked;
+    if (e.target.checked) $('#f-enddate').value = '';
+  };
   $('#form-new').onsubmit = submitForm;
   $('#saved-copy').onclick = () => copyText($('#saved-link').value).then(ok => toast(ok ? 'Redigeringslenken er kopiert – lim den inn et trygt sted.' : 'Kunne ikke kopiere. Marker teksten og kopier manuelt.'));
   $('#form-occurrence').onsubmit = submitOccurrence;
@@ -1296,7 +1343,7 @@ function init() {
   $('#more').onclick = () => { listMonths += 6; render(); };
   $('#btn-new').onclick = () => openNew(); $('#fab').onclick = () => openNew();
   $('#btn-export').onclick = () => {
-    const list = events.filter(ev => ev.approved && inCity(ev) && (ev.recurrence || ev.start_date >= todayISO));
+    const list = events.filter(ev => ev.approved && inCity(ev) && (ev.recurrence || lastDate(ev) >= todayISO));
     if (!list.length) return toast('Ingen godkjente arrangementer å eksportere.');
     download(`dyrevernkalenderen-${city.toLowerCase().replace(/[^a-z0-9]+/g,'-')}.ics`, icsFile(list, 'Dyrevernkalenderen – ' + city));
   };
