@@ -23,6 +23,15 @@
 <meta property="og:image:alt" content="Aktivister samlet bak et banner med teksten The National Animal Rights Day">
 <meta name="twitter:card" content="summary_large_image">
 
+<!-- Ikon i fanen og når siden lagres på mobilskjermen -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%233a8a5c'/%3E%3Cg fill='%23ffffff'%3E%3Cellipse cx='22' cy='23' rx='6' ry='8'/%3E%3Cellipse cx='42' cy='23' rx='6' ry='8'/%3E%3Cellipse cx='12' cy='35' rx='5.5' ry='7'/%3E%3Cellipse cx='52' cy='35' rx='5.5' ry='7'/%3E%3Cellipse cx='32' cy='45' rx='13' ry='10'/%3E%3C/g%3E%3C/svg%3E">
+<link rel="apple-touch-icon" href="ikon.png">
+
+<!-- Skrifttyper -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
 <!-- Forteller Google hva slags nettsted dette er -->
 <script type="application/ld+json">
 {
@@ -66,19 +75,24 @@
     --today: #3a8a5c;
     --radius: 12px;
     --shadow: 0 6px 24px rgba(40,80,50,.12);
+    --font-body: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    --font-display: 'Fraunces', Georgia, 'Times New Roman', serif;
   }
 
   * { box-sizing: border-box; }
   html, body { margin: 0; }
   body {
     background: var(--bg); color: var(--text);
-    font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font: 16px/1.5 var(--font-body);
     -webkit-font-smoothing: antialiased;
   }
   a { color: var(--accent); }
   button { font: inherit; color: inherit; cursor: pointer; }
   input, select, textarea { font: inherit; color: var(--text); }
   h1, h2, h3, h4 { margin: 0; line-height: 1.2; }
+  header.top h1, .month-nav h2, dialog .dlg-head h2, .upnext > h2 {
+    font-family: var(--font-display); font-weight: 700; letter-spacing: -.015em;
+  }
   [hidden] { display: none !important; }
 
   .wrap { max-width: 960px; margin: 0 auto; padding: 0 16px; }
@@ -88,8 +102,10 @@
     background: #f6faf3; border-bottom: 1px solid var(--border);
   }
   header.top .wrap { display: flex; align-items: center; gap: 12px; padding: 12px 16px; }
-  header.top h1 { font-size: 1.15rem; letter-spacing: -.01em; flex: 1; white-space: nowrap; }
+  header.top h1 { font-size: 1.2rem; white-space: nowrap; }
   header.top h1 span { color: var(--accent); }
+  .tagline { flex: 1; color: var(--muted); font-size: .85rem; border-left: 1px solid var(--border); padding-left: 12px; }
+  @media (max-width: 799px) { .tagline { display: none; } header.top h1 { flex: 1; } }
   .city-select {
     padding: 8px 32px 8px 12px; border: 1px solid var(--border); border-radius: 999px;
     background: var(--surface-2); appearance: none; -webkit-appearance: none;
@@ -103,7 +119,7 @@
     font-size: .9rem; padding: 8px 0;
   }
 
-    .hero { margin: 16px 0 4px; border-radius: 16px; overflow: hidden; position: relative; aspect-ratio: 16 / 6; background: var(--surface-2); }
+    .hero { margin: 16px 0 4px; border-radius: 16px; overflow: hidden; position: relative; aspect-ratio: 24 / 7; background: var(--surface-2); }
   .hero img { width: 100%; height: 100%; object-fit: cover; display: block; }
   .hero figcaption {
     position: absolute; left: 0; right: 0; bottom: 0; padding: 28px 18px 14px;
@@ -112,6 +128,57 @@
   }
   @media (max-width: 699px) { .hero { aspect-ratio: 3 / 2; border-radius: 12px; } }
   .photo-credit { margin: 5px 4px 0; text-align: right; font-size: .72rem; color: var(--muted); }
+  /* «Neste ut» – de nærmeste arrangementene, rett under bildet */
+  .upnext { margin: 20px 0 4px; }
+  .upnext > h2 { font-size: 1.05rem; margin-bottom: 10px; }
+  .upnext-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .up {
+    text-align: left; background: var(--surface); border: 1px solid var(--border);
+    border-top: 4px solid var(--c); border-radius: var(--radius); padding: 12px 14px;
+    display: flex; flex-direction: column; gap: 3px; min-width: 0; transition: transform .08s ease;
+  }
+  .up:hover { transform: translateY(-2px); border-color: var(--muted); border-top-color: var(--c); }
+  .up .when { font-size: .78rem; font-weight: 700; color: var(--accent-hover); text-transform: uppercase; letter-spacing: .04em; }
+  .up .what { font-family: var(--font-display); font-weight: 600; font-size: 1rem; line-height: 1.25;
+              display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .up .who { font-size: .8rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  @media (max-width: 699px) {
+    .upnext-row { grid-template-columns: 1fr; gap: 8px; }
+    .upnext { margin-top: 16px; }
+  }
+
+  /* Kategorifiltre */
+  .filters { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 0 2px; }
+  .filters button {
+    display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--border);
+    background: var(--surface); border-radius: 999px; padding: 5px 12px; font-size: .82rem; font-weight: 600;
+    color: var(--muted);
+  }
+  .filters button i { width: 9px; height: 9px; border-radius: 50%; background: var(--c); flex: none; }
+  .filters button.on { background: color-mix(in srgb, var(--c) 16%, transparent); border-color: var(--c); color: var(--text); }
+  .filters button.reset { color: var(--danger); font-weight: 700; }
+  /* På mobil: én rad man sveiper, i stedet for tre rader som spiser høyde
+     og havner under den flytende «Foreslå»-knappen */
+  @media (max-width: 699px) {
+    .filters { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; -ms-overflow-style: none; padding-bottom: 6px; }
+    .filters::-webkit-scrollbar { display: none; }
+    .filters button { flex: none; }
+  }
+  .count { color: var(--muted); font-size: .85rem; margin: 2px 0 0; }
+
+  /* Tom måned */
+  .month-empty {
+    margin-top: 10px; padding: 18px 14px; text-align: center; color: var(--muted);
+    background: var(--surface); border: 1px dashed var(--border); border-radius: var(--radius);
+  }
+
+  /* Plassholdere mens databasen svarer */
+  @keyframes shimmer { 0% { opacity: .5; } 50% { opacity: .95; } 100% { opacity: .5; } }
+  .sk { animation: shimmer 1.3s ease-in-out infinite; background: var(--surface-2); border-radius: var(--radius); }
+  .sk-card { height: 66px; margin-bottom: 8px; border: 1px solid var(--border); }
+  .sk-cell { border: 1px solid var(--border); border-radius: 8px; min-height: 60px; }
+  @media (min-width: 700px) { .sk-cell { min-height: 100px; } }
+
   .toolbar { display: flex; align-items: center; gap: 10px; padding: 14px 0 6px; flex-wrap: wrap; }
   .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 999px; overflow: hidden; background: var(--surface); }
   .seg button { border: 0; background: transparent; padding: 8px 16px; font-weight: 600; color: var(--muted); }
@@ -128,9 +195,11 @@
   .spacer { flex: 1; }
 
   /* Måned */
-  .month-nav { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; }
-  .month-nav h2 { font-size: 1.15rem; text-transform: capitalize; }
-  .month-nav button { border: 1px solid var(--border); background: var(--surface); border-radius: 999px; width: 40px; height: 40px; font-size: 1.3rem; line-height: 1; }
+  .month-nav { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 0 8px; }
+  .month-nav h2 { font-size: 1.3rem; text-transform: capitalize; }
+  .nav-btns { display: flex; align-items: center; gap: 6px; }
+  .nav-btns .arrow { border: 1px solid var(--border); background: var(--surface); border-radius: 999px; width: 38px; height: 38px; font-size: 1.3rem; line-height: 1; }
+  .nav-btns .arrow:hover { border-color: var(--muted); }
   .weekdays, .grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 3px; }
   .weekdays div { text-align: center; font-size: .75rem; color: var(--muted); font-weight: 600; padding: 4px 0; text-transform: uppercase; letter-spacing: .04em; }
   .cell {
@@ -177,13 +246,12 @@
   .card .body { padding: 10px 12px; min-width: 0; flex: 1; }
   .card h4 { font-size: 1rem; margin: 2px 0; }
   .card .meta { font-size: .82rem; color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; }
+  .card .meta .time { font-size: .92rem; font-weight: 700; color: var(--text); }
+  .card h4 { font-family: var(--font-display); font-weight: 600; }
   .badge { font-size: .72rem; font-weight: 700; padding: 1px 8px; border-radius: 999px; background: color-mix(in srgb, var(--pending) 15%, transparent); color: var(--pending); }
   .badge.cat { background: color-mix(in srgb, var(--c) 18%, transparent); color: var(--text); }
 
   footer { margin: 40px 0 60px; color: var(--muted); font-size: .85rem; }
-  .legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 10px 0; }
-  .legend span { display: inline-flex; align-items: center; gap: 6px; }
-  .legend i { width: 10px; height: 10px; border-radius: 50%; background: var(--c); display: inline-block; }
 
   /* Dialoger */
   dialog {
@@ -277,6 +345,7 @@
 <header class="top">
   <div class="wrap">
     <h1>🐾 Dyrevern<span>kalenderen</span></h1>
+    <p class="tagline">Arrangementer for dyra – i hele Norge</p>
     <select id="city" class="city-select" aria-label="Velg by"></select>
   </div>
 </header>
@@ -289,6 +358,12 @@
     <figcaption>Sammen for dyra – finn noe å bli med på!</figcaption>
   </figure>
   <p class="photo-credit">Foto: Werner Rinde</p>
+
+  <section class="upnext" id="upnext" hidden>
+    <h2>Neste ut</h2>
+    <div class="upnext-row" id="upnext-row"></div>
+  </section>
+
   <div class="toolbar">
     <div class="seg" role="tablist">
       <button data-view="month" class="active">Måned</button>
@@ -298,16 +373,22 @@
     <button id="btn-export" class="btn small" title="Last ned alle godkjente arrangementer for valgt by">⤓ .ics</button>
     <button id="btn-new" class="btn primary">+ Foreslå arrangement</button>
   </div>
+  <div class="filters" id="filters"></div>
+  <p class="count" id="count"></p>
 
   <main>
     <section id="month-view">
       <div class="month-nav">
-        <button id="prev" aria-label="Forrige måned">‹</button>
         <h2 id="month-title"></h2>
-        <button id="next" aria-label="Neste måned">›</button>
+        <div class="nav-btns">
+          <button id="today" class="btn small">I dag</button>
+          <button id="prev" class="arrow" aria-label="Forrige måned">‹</button>
+          <button id="next" class="arrow" aria-label="Neste måned">›</button>
+        </div>
       </div>
       <div class="weekdays"><div>man</div><div>tir</div><div>ons</div><div>tor</div><div>fre</div><div>lør</div><div>søn</div></div>
       <div id="grid" class="grid"></div>
+      <div id="month-empty"></div>
       <div id="day-list" class="day-list"></div>
     </section>
 
@@ -318,7 +399,6 @@
   </main>
 
   <footer>
-    <div class="legend" id="legend"></div>
     <p>Alle kan foreslå arrangementer. Et forslag blir synlig som «venter» med én gang, og godkjent når tre andre personer har godkjent det. Forslag som ikke får tre godkjenninger innen 14 dager, fjernes. Arrangementer i kategorien «Digitalt», og de som er merket med byen «Nasjonalt / digitalt», vises i alle bykalendere.</p>
     <p>Når du sender inn et arrangement, får du en hemmelig redigeringslenke. Med den kan du rette opplysninger eller slette arrangementet senere – også fra en annen enhet. Ta vare på den.</p>
     <p>Vil du ha kalenderen i din egen kalender-app? Trykk «.ics» øverst for å laste ned alle godkjente arrangementer i valgt by, eller last ned ett arrangement om gangen.</p>
@@ -664,6 +744,8 @@ let view = 'month';
 let cursor = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 let selectedDay = todayISO;
 let listMonths = 6;
+let loading = true;                  // sant til databasen har svart første gang
+let activeCats = new Set();          // tomt = vis alle kategorier
 
 /* ---------- Forekomster (håndterer gjentakelse) ---------- */
 /* Digitale arrangementer har ingen fysisk plass, og vises derfor i alle byer –
@@ -716,10 +798,11 @@ function effective(ev, date) {
     overridden:  true
   };
 }
+const inFilter = ev => activeCats.size === 0 || activeCats.has(ev.category);
 function visibleInstances(from, to) {
   const list = [];
   for (const ev of events) {
-    if (!inCity(ev) || isStale(ev)) continue;
+    if (!inCity(ev) || isStale(ev) || !inFilter(ev)) continue;
     for (const inst of instances(ev, from, to)) list.push({ ev: effective(ev, inst.date), date: inst.date });
   }
   list.sort((a, b) => a.date.localeCompare(b.date) || (a.ev.start_time || '').localeCompare(b.ev.start_time || '') || a.ev.title.localeCompare(b.ev.title));
@@ -746,7 +829,7 @@ function cardHTML(inst) {
   return `<article class="card ${pending ? 'pending' : ''} ${ev.cancelled ? 'off' : ''}" data-id="${esc(ev.id)}" data-date="${inst.date}" style="--c:${cat.color}">
     <div class="bar"></div>
     <div class="body">
-      <div class="meta"><span>${esc(timeRangeOn(ev, inst.date))}</span><span>·</span><span>${esc(cat.label)}</span>${isMultiDay(ev) ? `<span class="badge span">Dag ${dayNumber(ev, inst.date)} av ${dayCount(ev)}</span>` : ''}${ev.cancelled ? `<span class="badge off">Avlyst</span>` : ''}${pending ? `<span class="badge">Venter ${ev.approval_count}/3</span>` : ''}</div>
+      <div class="meta"><span class="time">${esc(timeRangeOn(ev, inst.date))}</span><span>·</span><span>${esc(cat.label)}</span>${isMultiDay(ev) ? `<span class="badge span">Dag ${dayNumber(ev, inst.date)} av ${dayCount(ev)}</span>` : ''}${ev.cancelled ? `<span class="badge off">Avlyst</span>` : ''}${pending ? `<span class="badge">Venter ${ev.approval_count}/3</span>` : ''}</div>
       <h4>${esc(ev.title)}</h4>
       <div class="meta">${esc([sub, (ev.category === 'digitalt' || ev.city === city) ? '' : ev.city].filter(Boolean).join(' · '))}${ev.recurrence ? ' <span>↻ ukentlig</span>' : ''}</div>
     </div>
@@ -777,6 +860,12 @@ function renderMonth() {
     </button>`;
   }
   $('#grid').innerHTML = html;
+  // Er hele måneden tom, si det – i stedet for 35 blanke ruter uten forklaring
+  const iMaaneden = visibleInstances(iso(first), iso(new Date(y, m, daysInMonth))).length;
+  const maaned = new Intl.DateTimeFormat('nb-NO', { month: 'long' }).format(cursor);
+  $('#month-empty').innerHTML = iMaaneden ? '' :
+    `<div class="month-empty">Ingen arrangementer i ${esc(city)} i ${esc(maaned)}${activeCats.size ? ' i valgte kategorier' : ''} ennå.
+     <a href="#" data-new>Foreslå noe?</a></div>`;
   renderDayList();
 }
 function renderDayList() {
@@ -795,10 +884,59 @@ function renderList() {
   }
   $('#list').innerHTML = html;
 }
+/* Grå plassholdere mens databasen svarer */
+function renderSkeleton() {
+  $('#grid').innerHTML = Array.from({ length: 35 }, () => '<div class="sk sk-cell"></div>').join('');
+  const kort = '<div class="sk sk-card"></div>'.repeat(3);
+  $('#day-list').innerHTML = kort;
+  $('#list').innerHTML = kort;
+  $('#upnext').hidden = true;
+  $('#count').textContent = '';
+}
+
+/* De tre nærmeste arrangementene, vist rett under bildet */
+function renderUpNext() {
+  const box = $('#upnext');
+  if (loading) { box.hidden = true; return; }
+  const list = visibleInstances(todayISO, iso(addDays(new Date(), 365))).slice(0, 3);
+  if (!list.length) { box.hidden = true; return; }
+  box.hidden = false;
+  $('#upnext-row').innerHTML = list.map(inst => {
+    const ev = inst.ev, cat = catOf(ev);
+    const naar = inst.date === todayISO ? 'I dag'
+      : inst.date === iso(addDays(new Date(), 1)) ? 'I morgen'
+      : cap(new Intl.DateTimeFormat('nb-NO', { weekday: 'short', day: 'numeric', month: 'short' }).format(parseISO(inst.date)));
+    return `<button class="up card-link" data-id="${esc(ev.id)}" data-date="${inst.date}" style="--c:${cat.color}">
+      <span class="when">${esc(naar)}${ev.start_time ? ' · ' + esc(hhmm(ev.start_time)) : ''}${ev.cancelled ? ' · AVLYST' : ''}</span>
+      <span class="what">${esc(ev.title)}</span>
+      <span class="who">${esc(ev.organizer || ev.location || cat.label)}</span>
+    </button>`;
+  }).join('');
+}
+
+function renderFilters() {
+  $('#filters').innerHTML = Object.entries(CATEGORIES).map(([k, v]) =>
+    `<button data-cat="${k}" class="${activeCats.has(k) ? 'on' : ''}" style="--c:${v.color}"><i></i>${esc(v.label)}</button>`
+  ).join('') + (activeCats.size ? `<button class="reset" data-cat="">✕ Vis alle</button>` : '');
+}
+
+function renderCount() {
+  if (loading) return;
+  const n = visibleInstances(todayISO, iso(addDays(new Date(), 365))).length;
+  const filtrert = activeCats.size ? ' med valgte kategorier' : '';
+  $('#count').textContent = n
+    ? `${n} ${n === 1 ? 'arrangement' : 'arrangementer'} i ${city}${filtrert} det neste året`
+    : `Ingen arrangementer i ${city}${filtrert} det neste året`;
+}
+
 function render() {
   $('#month-view').hidden = view !== 'month';
   $('#list-view').hidden = view !== 'list';
   document.querySelectorAll('.seg button').forEach(b => b.classList.toggle('active', b.dataset.view === view));
+  renderFilters();
+  if (loading) { renderSkeleton(); return; }
+  renderUpNext();
+  renderCount();
   if (view === 'month') renderMonth(); else renderList();
 }
 
@@ -1073,6 +1211,7 @@ async function reload() {
     overrideMap = {};
     for (const o of await db.loadOverrides()) overrideMap[o.event_id + '|' + o.occurrence_date] = o;
   } catch (e) { overrideMap = {}; console.warn('Kunne ikke hente endringer på enkeltdager:', e); }
+  loading = false;
   render();
   try { updateStructuredData(); } catch (e) { console.warn('Kunne ikke bygge strukturerte data:', e); }
 }
@@ -1334,7 +1473,6 @@ function init() {
   $('#f-category').innerHTML = Object.entries(CATEGORIES).map(([k, v]) => `<option value="${k}">${esc(v.label)}</option>`).join('');
   $('#f-city').innerHTML = [...CITIES, NATIONAL].map(c => `<option>${esc(c)}</option>`).join('');
   $('#weekday-picks').innerHTML = [1,2,3,4,5,6,0].map(w => `<label><input type="checkbox" value="${w}"><span>${WEEKDAY_SHORT[w]}</span></label>`).join('');
-  $('#legend').innerHTML = Object.values(CATEGORIES).map(c => `<span style="--c:${c.color}"><i></i>${esc(c.label)}</span>`).join('');
   $('#f-category').onchange = updateDigitalHint;
   // Gjentakelse og flerdagers utelukker hverandre
   $('#f-recurring').onchange = e => {
@@ -1351,6 +1489,20 @@ function init() {
   document.querySelectorAll('.seg button').forEach(b => b.onclick = () => { view = b.dataset.view; render(); });
   $('#prev').onclick = () => { cursor.setMonth(cursor.getMonth() - 1); render(); };
   $('#next').onclick = () => { cursor.setMonth(cursor.getMonth() + 1); render(); };
+  $('#today').onclick = () => {
+    const d = new Date();
+    cursor = new Date(d.getFullYear(), d.getMonth(), 1);
+    selectedDay = todayISO; view = 'month'; render();
+  };
+  // Kategorifiltre
+  $('#filters').addEventListener('click', e => {
+    const b = e.target.closest('[data-cat]'); if (!b) return;
+    const k = b.dataset.cat;
+    if (!k) activeCats.clear();
+    else if (activeCats.has(k)) activeCats.delete(k);
+    else activeCats.add(k);
+    render();
+  });
   $('#more').onclick = () => { listMonths += 6; render(); };
   $('#btn-new').onclick = () => openNew(); $('#fab').onclick = () => openNew();
   $('#btn-export').onclick = () => {
@@ -1364,7 +1516,7 @@ function init() {
   document.body.addEventListener('click', e => {
     const cell = e.target.closest('.cell');
     if (cell) { selectedDay = cell.dataset.date; const d = parseISO(selectedDay); if (d.getMonth() !== cursor.getMonth()) cursor = new Date(d.getFullYear(), d.getMonth(), 1); render(); $('#day-list').scrollIntoView({ behavior:'smooth', block:'nearest' }); return; }
-    const card = e.target.closest('.card');
+    const card = e.target.closest('.card, .up');
     if (card) { openEvent(card.dataset.id, card.dataset.date); return; }
     if (e.target.closest('[data-new]')) { e.preventDefault(); openNew(); return; }
     const dlg = $('#dlg-event'); const ev = events.find(x => x.id === dlg.dataset.id); const date = dlg.dataset.date;
